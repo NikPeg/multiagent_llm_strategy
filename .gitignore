@@ -1,0 +1,12 @@
+.idea/vcs.xml
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.log
+*.out
+*.run.xml
+*.toc
+*.dvi
+*.fls
+*.fdb_latexmk
