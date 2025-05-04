@@ -1,2 +1,5 @@
-# multiagent_llm_strategy
-A university course project: development of a multi-agent, text-based strategic game powered by orchestrated large language models (LLMs). The repository contains all source code and documentation related to the project.
+# Мультиагентная текстовая стратегическая игра
+
+## Документация
+В репозитории размещены все материалы проекта, включая текст курсовой работы.
+Для оформления текста курсовой работы использовался шаблон viafanasyev/bachelor-thesis-template.
