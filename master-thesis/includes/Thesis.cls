@@ -115,20 +115,20 @@
 \newcommand{\@setThesisKeysDefaults}{
     \setkeys{thesisKeys}{
         institute = ПРАВИТЕЛЬСТВО РОССИЙСКОЙ ФЕДЕРАЦИИ\\ФЕДЕРАЛЬНОЕ ГОСУДАРСТВЕННОЕ АВТОНОМНОЕ\\ОБРАЗОВАТЕЛЬНОЕ УЧРЕЖДЕНИЕ ВЫСШЕГО ОБРАЗОВАНИЯ\\НАЦИОНАЛЬНЫЙ ИССЛЕДОВАТЕЛЬСКИЙ УНИВЕРСИТЕТ\\<<ВЫСШАЯ ШКОЛА ЭКОНОМИКИ>>,
-        faculty = Факультет компьютерных наук\\Департамент программной инженерии,
-        year = 2022,
+        faculty = Факультет компьютерных наук\\Магистерская программа\\<<Исследования и предпринимательство\\в искусственном интеллекте>>,
+        year = 2025,
         city = Москва,
         title = \@TODO,
         authorGroup = \@TODO,
         authorName = \@TODO,
         UDC = \@TODO,
-        educationalProgram = 09.03.04 <<Программная инженерия>>,
+        educationalProgram = 01.04.02 <<Прикладная математика и информатика>>,
         academicTeacherTitle = \@TODO,
         academicTeacherName = \@TODO,
         academicCoteacherName = \@TODO,
         academicCoteacherTitle = \@TODO,
-        academicSupervisorTitle = {Академический руководитель\\образовательной программы\\<<Программная инженерия>>,\\профессор департамента программной\\инженерии, канд. техн. наук},
-        academicSupervisorName = В. В. Шилов,
+        academicSupervisorTitle = {Академический руководитель\\образовательной программы\\<<Исследования и предпринимательство в искусственном интеллекте>>},
+        academicSupervisorName = Д. С. Лялин,
         consultantTitle = \@TODO,
         consultantName = \@TODO,
         isAcademic = false,
@@ -206,7 +206,7 @@
     	    \else
     	        \vspace{15mm}
 	        \fi
-        	\textbf{Выпускная квалификационная работа}\\
+        	\textbf{Курсовая работа}\\
         	\ifx\@isAcademic\@true
         	    (академическая)\\
     	    \else
