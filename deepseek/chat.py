@@ -1,12 +1,13 @@
-from transformers import AutoModelForCausalLM, AutoTokenizer
-import torch
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig
 
 model_name = "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B"
+quant_config = BitsAndBytesConfig(load_in_8bit=True)
+
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 model = AutoModelForCausalLM.from_pretrained(
     model_name,
     device_map="auto",
-    load_in_8bit=True
+    quantization_config=quant_config
 )
 
 history = []
@@ -26,7 +27,6 @@ while True:
     # Формируем контекст для модели
     context = '\n'.join(history) + "\nМодель:"
 
-    # Токенизация и генерация ответа
     inputs = tokenizer(context, return_tensors="pt").to(model.device)
     outputs = model.generate(
         **inputs,
