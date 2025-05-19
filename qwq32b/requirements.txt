@@ -1,0 +1,8 @@
+torch
+torchvision
+torchaudio
+transformers
+huggingface_hub[hf_xet]
+accelerate
+bitsandbytes
+hf_xet
