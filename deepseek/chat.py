@@ -30,7 +30,7 @@ while True:
     inputs = tokenizer(context, return_tensors="pt").to(model.device)
     outputs = model.generate(
         **inputs,
-        max_new_tokens=1000,
+        max_new_tokens=512,
         do_sample=True,
         temperature=0.7,
         top_p=0.95,
