@@ -1,3 +1,8 @@
+# Базовые инструменты
+setuptools>=59.6.0
+wheel>=0.37.1
+pip>=21.3.1
+
 # Основные библиотеки для бота
 aiogram==2.20
 python-dotenv==0.19.2
@@ -14,7 +19,8 @@ chromadb==0.4.6
 langchain==0.0.267
 langchain_community==0.0.10
 sentence-transformers==2.2.2
-torch==2.0.1
+# PyTorch должен быть установлен отдельно с CUDA
+# pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu128
 transformers==4.30.2
 tokenizers==0.13.3
 
@@ -51,3 +57,4 @@ tabulate==0.9.0
 python-dateutil==2.8.2
 pytz==2023.3
 cachetools==5.3.1
+

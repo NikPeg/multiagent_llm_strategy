@@ -1,1 +1,5 @@
+.python-version
+game_data.db
+utils/__pycache__/
 .env
+
