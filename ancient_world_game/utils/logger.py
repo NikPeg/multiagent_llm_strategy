@@ -207,13 +207,18 @@ def log_model_interaction(prompt: str, response: str, model_name: str,
     logger.debug(f"Ответ: {response}")
 
 
-def get_logger():
+def get_logger(name=None):
     """
     Возвращает настроенный логгер.
+
+    Args:
+        name (str, optional): Имя логгера. Если не указано, возвращает корневой логгер.
 
     Returns:
         Настроенный объект логгера
     """
+    if name:
+        return logging.getLogger(name)
     return logger
 
 
