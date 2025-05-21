@@ -14,7 +14,7 @@ setup_logger()
 logger = logging.getLogger(__name__)
 
 # Импортируем конфигурацию и экземпляр бота
-from config.config import (
+from config import (
     BOT_TOKEN,
     WEBHOOK_URL,
     WEBHOOK_PATH,
