@@ -6,6 +6,9 @@ from aiogram.utils.callback_data import CallbackData
 import logging
 
 from storage import (
+    get_all_users,
+    get_subscribers,
+    get_active_users,
     get_user_by_telegram_id,
     update_user_role,
     create_user_if_not_exists,
@@ -69,7 +72,16 @@ async def process_admin_callback(callback_query: types.CallbackQuery, callback_d
     action = callback_data["action"]
 
     # Обработка разных действий
-    if action == "add_admin":
+    if action == "list_users":
+        await list_all_users(callback_query)
+
+    elif action == "list_subscribers":
+        await list_subscribers(callback_query)
+
+    elif action == "list_active":
+        await list_active_users(callback_query)
+
+    elif action == "add_admin":
         await callback_query.message.answer("Введите Telegram ID пользователя, которого хотите назначить администратором:")
         await AddAdminStates.waiting_for_user_id.set()
 
