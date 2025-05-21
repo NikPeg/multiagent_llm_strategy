@@ -84,32 +84,79 @@ def register_all_handlers(dp: Dispatcher, admin_ids: list):
     dp.register_message_handler(cmd_settings, Command("settings"))
 
     # Административные команды
-    dp.register_message_handler(cmd_admin, Command("admin"), lambda msg: msg.from_user.id in admin_ids)
-    dp.register_message_handler(cmd_broadcast, Command("broadcast"), lambda msg: msg.from_user.id in admin_ids)
+    dp.register_message_handler(
+        cmd_admin,
+        lambda msg: msg.from_user.id in admin_ids,
+        Command("admin")
+    )
+    dp.register_message_handler(
+        cmd_broadcast,
+        lambda msg: msg.from_user.id in admin_ids,
+        Command("broadcast")
+    )
 
     # Обработчики состояний для административных команд
-    dp.register_message_handler(add_admin, state=AddAdminStates.waiting_for_user_id,
-                                lambda msg: msg.from_user.id in admin_ids)
-    dp.register_message_handler(remove_admin, state=RemoveAdminStates.waiting_for_user_id,
-                                lambda msg: msg.from_user.id in admin_ids)
-    dp.register_message_handler(get_user_info, state=UserInfoStates.waiting_for_user_id,
-                                lambda msg: msg.from_user.id in admin_ids)
+    dp.register_message_handler(
+        add_admin,
+        lambda msg: msg.from_user.id in admin_ids,
+        state=AddAdminStates.waiting_for_user_id
+    )
+    dp.register_message_handler(
+        remove_admin,
+        lambda msg: msg.from_user.id in admin_ids,
+        state=RemoveAdminStates.waiting_for_user_id
+    )
+    dp.register_message_handler(
+        get_user_info,
+        lambda msg: msg.from_user.id in admin_ids,
+        state=UserInfoStates.waiting_for_user_id
+    )
 
     # Обработчики состояний для рассылки
-    dp.register_message_handler(process_broadcast_message, state=BroadcastStates.waiting_for_message,
-                                lambda msg: msg.from_user.id in admin_ids)
-    dp.register_message_handler(confirm_broadcast, Command("confirm"), state=BroadcastStates.waiting_for_message,
-                                lambda msg: msg.from_user.id in admin_ids)
-    dp.register_message_handler(cancel_broadcast, Command("cancel"), state=BroadcastStates.waiting_for_message,
-                                lambda msg: msg.from_user.id in admin_ids)
-    dp.register_message_handler(process_other_message, state=BroadcastStates.waiting_for_message,
-                                lambda msg: msg.from_user.id in admin_ids)
+    dp.register_message_handler(
+        process_broadcast_message,
+        lambda msg: msg.from_user.id in admin_ids,
+        state=BroadcastStates.waiting_for_message
+    )
+    dp.register_message_handler(
+        confirm_broadcast,
+        lambda msg: msg.from_user.id in admin_ids,
+        Command("confirm"),
+        state=BroadcastStates.waiting_for_message
+    )
+    dp.register_message_handler(
+        cancel_broadcast,
+        lambda msg: msg.from_user.id in admin_ids,
+        Command("cancel"),
+        state=BroadcastStates.waiting_for_message
+    )
+    dp.register_message_handler(
+        process_other_message,
+        lambda msg: msg.from_user.id in admin_ids,
+        state=BroadcastStates.waiting_for_message
+    )
 
     # Команды для чатов
-    dp.register_message_handler(cmd_who, Command("who"), lambda msg: msg.chat.type != 'private')
-    dp.register_message_handler(cmd_future, Command("future"), lambda msg: msg.chat.type != 'private')
-    dp.register_message_handler(cmd_goal, Command("goal"), lambda msg: msg.chat.type != 'private')
-    dp.register_message_handler(cmd_stat, Command("stat"), lambda msg: msg.chat.type != 'private')
+    dp.register_message_handler(
+        cmd_who,
+        lambda msg: msg.chat.type != 'private',
+        Command("who")
+    )
+    dp.register_message_handler(
+        cmd_future,
+        lambda msg: msg.chat.type != 'private',
+        Command("future")
+    )
+    dp.register_message_handler(
+        cmd_goal,
+        lambda msg: msg.chat.type != 'private',
+        Command("goal")
+    )
+    dp.register_message_handler(
+        cmd_stat,
+        lambda msg: msg.chat.type != 'private',
+        Command("stat")
+    )
 
     # Игровые команды
     dp.register_message_handler(cmd_action, Command("action"))
@@ -118,13 +165,24 @@ def register_all_handlers(dp: Dispatcher, admin_ids: list):
     dp.register_message_handler(cmd_report, Command("report"))
 
     # Регистрация обработчика результатов действий
-    dp.register_message_handler(cmd_action_result, lambda msg: msg.text.startswith("/result_"))
+    dp.register_message_handler(
+        cmd_action_result,
+        lambda msg: msg.text.startswith("/result_")
+    )
 
     # Отслеживание активности пользователей
-    dp.register_message_handler(update_user_activity, lambda msg: True, content_types=["text"])
+    dp.register_message_handler(
+        update_user_activity,
+        lambda msg: True,
+        content_types=["text"]
+    )
 
     # Обработка прямых сообщений как потенциальных приказов (только в личных сообщениях)
-    dp.register_message_handler(direct_action_processing, lambda msg: msg.chat.type == 'private', content_types=["text"])
+    dp.register_message_handler(
+        direct_action_processing,
+        lambda msg: msg.chat.type == 'private',
+        content_types=["text"]
+    )
 
     # Регистрация обработчиков callback-запросов
     dp.register_callback_query_handler(process_action_confirmation, Text(equals=["confirm_action", "cancel_action"]))
