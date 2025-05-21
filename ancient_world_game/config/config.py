@@ -17,10 +17,6 @@ load_dotenv(dotenv_path=ENV_PATH)
 
 # Настройки Telegram бота
 BOT_TOKEN = os.getenv('BOT_TOKEN')
-WEBHOOK_URL = os.getenv('WEBHOOK_URL')
-WEBHOOK_PATH = os.getenv('WEBHOOK_PATH', '/webhook')
-WEBHOOK_HOST = os.getenv('WEBHOOK_HOST', '0.0.0.0')
-WEBHOOK_PORT = int(os.getenv('WEBHOOK_PORT', '8443'))
 
 # Администраторы бота
 ADMIN_IDS_STR = os.getenv('ADMIN_IDS', '')

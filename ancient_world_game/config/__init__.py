@@ -21,10 +21,6 @@ from .game_constants import (
 # Экспортируем основные настройки из объекта config для обратной совместимости
 # Это позволит коду, использующему прямой импорт атрибутов, работать корректно
 BOT_TOKEN = config.BOT_TOKEN
-WEBHOOK_URL = config.WEBHOOK_URL
-WEBHOOK_PATH = config.WEBHOOK_PATH
-WEBHOOK_HOST = config.WEBHOOK_HOST
-WEBHOOK_PORT = config.WEBHOOK_PORT
 ADMIN_IDS = config.ADMIN_IDS
 ADMIN_CHAT_ID = config.ADMIN_CHAT_ID
 DB_PATH = config.DB_PATH
@@ -56,10 +52,6 @@ __all__ = [
 
     # Прямые экспорты настроек
     'BOT_TOKEN',
-    'WEBHOOK_URL',
-    'WEBHOOK_PATH',
-    'WEBHOOK_HOST',
-    'WEBHOOK_PORT',
     'ADMIN_IDS',
     'ADMIN_CHAT_ID',
     'DB_PATH',

@@ -39,10 +39,6 @@ asyncio==3.4.3
 loguru==0.7.0
 prometheus-client==0.17.1
 
-# Веб-сервер для webhook
-uvicorn==0.22.0
-fastapi==0.98.0
-
 # Работа с изображениями и графиками
 pillow==9.5.0
 seaborn==0.12.2

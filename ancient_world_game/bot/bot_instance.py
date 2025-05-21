@@ -4,7 +4,7 @@ from aiogram import Bot, Dispatcher, types
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from aiogram.contrib.middlewares.logging import LoggingMiddleware
 
-from config.config import BOT_TOKEN, ADMIN_IDS, WEBHOOK_URL, WEBHOOK_PATH, WEBAPP_HOST, WEBAPP_PORT
+from config.config import BOT_TOKEN, ADMIN_IDS
 from .middlewares import setup_middlewares
 from .handlers import register_all_handlers
 from storage import setup_database, create_tables, check_database_connection
@@ -60,16 +60,10 @@ async def on_startup(dp: Dispatcher):
                 admin_id,
                 "🔄 Бот запущен и готов к работе!\n\n"
                 f"Версия: 1.0.0\n"
-                f"Режим: {'webhook' if WEBHOOK_URL else 'polling'}\n"
                 f"Время запуска: {asyncio.get_event_loop().time()}"
             )
         except Exception as e:
             logger.error(f"Failed to notify admin {admin_id}: {str(e)}")
-
-    # Настройка webhook если указан URL
-    if WEBHOOK_URL:
-        await bot.set_webhook(WEBHOOK_URL + WEBHOOK_PATH)
-        logger.info(f"Webhook set to {WEBHOOK_URL + WEBHOOK_PATH}")
 
     logger.info("Bot started successfully")
 
@@ -94,11 +88,6 @@ async def on_shutdown(dp: Dispatcher):
 
     # Закрытие соединений с базой данных и другие операции очистки
     # Здесь должен быть код закрытия соединений
-
-    # Удаление вебхука перед остановкой
-    if WEBHOOK_URL:
-        await bot.delete_webhook()
-        logger.info("Webhook removed")
 
     # Закрытие хранилища состояний
     await dp.storage.close()
@@ -141,31 +130,8 @@ def start_polling():
         on_shutdown=on_shutdown
     )
 
-def start_webhook():
-    """
-    Запускает бота в режиме webhook
-    """
-    logger.info(f"Starting bot in webhook mode on {WEBAPP_HOST}:{WEBAPP_PORT}{WEBHOOK_PATH}")
-    from aiogram import executor
-
-    # Настраиваем бота
-    _, dispatcher = setup_bot()
-
-    # Запускаем webhook
-    executor.start_webhook(
-        dispatcher=dispatcher,
-        webhook_path=WEBHOOK_PATH,
-        on_startup=on_startup,
-        on_shutdown=on_shutdown,
-        skip_updates=True,
-        host=WEBAPP_HOST,
-        port=WEBAPP_PORT,
-    )
 
 # Если файл запущен как основной, запускаем бота
 if __name__ == "__main__":
     # Выбираем режим работы в зависимости от настроек
-    if WEBHOOK_URL:
-        start_webhook()
-    else:
-        start_polling()
+    start_polling()

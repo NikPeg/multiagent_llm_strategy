@@ -83,12 +83,6 @@ DATABASE_URL=sqlite:///game.db
 
 # ID администраторов (через запятую)
 ADMIN_IDS=123456789,987654321
-
-# Настройки webhook (если нужно)
-# WEBHOOK_URL=https://your-domain.com/webhook
-# WEBHOOK_PATH=/webhook
-# WEBAPP_HOST=0.0.0.0
-# WEBAPP_PORT=8000
 ```
 Запуск бота
 ```bash

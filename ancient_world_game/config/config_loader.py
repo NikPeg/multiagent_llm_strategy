@@ -46,10 +46,6 @@ class Config:
         """
         # Настройки Telegram бота
         self.BOT_TOKEN = os.getenv('BOT_TOKEN')
-        self.WEBHOOK_URL = os.getenv('WEBHOOK_URL', None)
-        self.WEBHOOK_PATH = os.getenv('WEBHOOK_PATH', '/webhook')
-        self.WEBHOOK_HOST = os.getenv('WEBHOOK_HOST', '0.0.0.0')
-        self.WEBHOOK_PORT = int(os.getenv('WEBHOOK_PORT', 8443))
 
         # Администраторы бота
         admin_ids_str = os.getenv('ADMIN_IDS', '')

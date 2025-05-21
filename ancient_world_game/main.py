@@ -16,10 +16,6 @@ logger = logging.getLogger(__name__)
 # Импортируем конфигурацию и экземпляр бота
 from config.config import (
     BOT_TOKEN,
-    WEBHOOK_URL,
-    WEBHOOK_PATH,
-    WEBAPP_HOST,
-    WEBAPP_PORT
 )
 from bot.bot_instance import setup_bot, on_startup, on_shutdown
 
@@ -38,28 +34,14 @@ def main():
     bot, dp = setup_bot()
 
     try:
-        # Определяем режим запуска (webhook или polling)
-        if WEBHOOK_URL:
-            logger.info(f"Starting bot in webhook mode at {WEBHOOK_URL}")
-            # Запускаем бота в режиме webhook
-            executor.start_webhook(
-                dispatcher=dp,
-                webhook_path=WEBHOOK_PATH,
-                on_startup=on_startup,
-                on_shutdown=on_shutdown,
-                skip_updates=True,
-                host=WEBAPP_HOST,
-                port=WEBAPP_PORT,
-            )
-        else:
-            logger.info("Starting bot in polling mode")
-            # Запускаем бота в режиме polling
-            executor.start_polling(
-                dispatcher=dp,
-                skip_updates=True,
-                on_startup=on_startup,
-                on_shutdown=on_shutdown
-            )
+        logger.info("Starting bot in polling mode")
+        # Запускаем бота в режиме polling
+        executor.start_polling(
+            dispatcher=dp,
+            skip_updates=True,
+            on_startup=on_startup,
+            on_shutdown=on_shutdown
+        )
     except (KeyboardInterrupt, SystemExit):
         logger.info("Bot stopped by user request")
     except Exception as e:
