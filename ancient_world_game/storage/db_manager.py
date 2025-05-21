@@ -644,3 +644,176 @@ def get_db() -> DBManager:
         DBManager: Экземпляр менеджера базы данных
     """
     return db
+
+@log_function_call
+def get_user_by_telegram_id(telegram_id: int) -> Optional[Dict[str, Any]]:
+    """
+    Получает данные пользователя по его Telegram ID.
+
+    Args:
+        telegram_id (int): ID пользователя в Telegram
+
+    Returns:
+        Optional[Dict[str, Any]]: Словарь с данными пользователя или None, если пользователь не найден
+    """
+    try:
+        # Сначала проверяем, является ли пользователь игроком
+        player_info = db.get_player_info(telegram_id)
+        if player_info:
+            # Добавляем дополнительную информацию для игрока
+            player_info['is_player'] = True
+            return player_info
+
+        # Если пользователь не игрок, ищем его в таблице users (для подписчиков)
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                "SELECT * FROM users WHERE telegram_id = ?",
+                (telegram_id,)
+            )
+
+            user = cursor.fetchone()
+            if not user:
+                return None
+
+            # Преобразуем sqlite3.Row в словарь
+            user_dict = dict(user)
+            user_dict['is_player'] = False
+            return user_dict
+
+    except sqlite3.Error as e:
+        logger.error(f"Ошибка при получении пользователя по Telegram ID: {e}")
+        return None
+
+@log_function_call
+def update_user_subscription_status(telegram_id: int, is_subscribed: bool) -> bool:
+    """
+    Обновляет статус подписки пользователя на уведомления.
+
+    Args:
+        telegram_id (int): ID пользователя в Telegram
+        is_subscribed (bool): Новый статус подписки
+
+    Returns:
+        bool: True если статус успешно обновлен, иначе False
+    """
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+
+            # Проверяем, существует ли таблица users
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
+            if not cursor.fetchone():
+                # Создаем таблицу, если она не существует
+                cursor.execute('''
+                CREATE TABLE IF NOT EXISTS users (
+                    telegram_id INTEGER PRIMARY KEY,
+                    username TEXT,
+                    first_name TEXT,
+                    last_name TEXT,
+                    is_subscribed BOOLEAN DEFAULT FALSE,
+                    is_admin BOOLEAN DEFAULT FALSE,
+                    registration_date TEXT NOT NULL,
+                    last_activity TEXT NOT NULL,
+                    notify_news BOOLEAN DEFAULT TRUE,
+                    notify_updates BOOLEAN DEFAULT TRUE,
+                    notify_events BOOLEAN DEFAULT TRUE
+                )
+                ''')
+
+            # Проверяем, существует ли запись о пользователе
+            cursor.execute(
+                "SELECT telegram_id FROM users WHERE telegram_id = ?",
+                (telegram_id,)
+            )
+
+            current_time = datetime.now().isoformat()
+
+            if cursor.fetchone():
+                # Обновляем существующую запись
+                cursor.execute(
+                    "UPDATE users SET is_subscribed = ?, last_activity = ? WHERE telegram_id = ?",
+                    (is_subscribed, current_time, telegram_id)
+                )
+            else:
+                # Создаем новую запись
+                cursor.execute(
+                    "INSERT INTO users (telegram_id, is_subscribed, registration_date, last_activity) VALUES (?, ?, ?, ?)",
+                    (telegram_id, is_subscribed, current_time, current_time)
+                )
+
+            conn.commit()
+            return True
+    except sqlite3.Error as e:
+        logger.error(f"Ошибка при обновлении статуса подписки: {e}")
+        return False
+
+@log_function_call
+def toggle_feature(user_id: int, feature: str) -> bool:
+    """
+    Переключает статус определенной функции (настройки) для пользователя.
+
+    Args:
+        user_id (int): ID пользователя в Telegram
+        feature (str): Название функции или настройки
+
+    Returns:
+        bool: Новый статус функции (True - включена, False - выключена)
+    """
+    try:
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+
+            # Проверяем, существует ли таблица users
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='users'")
+            if not cursor.fetchone():
+                # Создаем таблицу, если она не существует
+                cursor.execute('''
+                CREATE TABLE IF NOT EXISTS users (
+                    telegram_id INTEGER PRIMARY KEY,
+                    username TEXT,
+                    first_name TEXT,
+                    last_name TEXT,
+                    is_subscribed BOOLEAN DEFAULT FALSE,
+                    is_admin BOOLEAN DEFAULT FALSE,
+                    registration_date TEXT NOT NULL,
+                    last_activity TEXT NOT NULL,
+                    notify_news BOOLEAN DEFAULT TRUE,
+                    notify_updates BOOLEAN DEFAULT TRUE,
+                    notify_events BOOLEAN DEFAULT TRUE
+                )
+                ''')
+
+            # Проверяем текущее значение настройки
+            cursor.execute(
+                f"SELECT {feature} FROM users WHERE telegram_id = ?",
+                (user_id,)
+            )
+
+            result = cursor.fetchone()
+
+            if not result:
+                # Пользователь не найден, создаем запись
+                current_time = datetime.now().isoformat()
+                cursor.execute(
+                    "INSERT INTO users (telegram_id, registration_date, last_activity) VALUES (?, ?, ?)",
+                    (user_id, current_time, current_time)
+                )
+                # По умолчанию функция включена
+                new_status = False  # Инвертируем, так как потом мы её переключим
+            else:
+                # Получаем текущий статус
+                current_status = bool(result[feature])
+                new_status = not current_status
+
+            # Обновляем статус функции
+            cursor.execute(
+                f"UPDATE users SET {feature} = ? WHERE telegram_id = ?",
+                (new_status, user_id)
+            )
+
+            conn.commit()
+            return new_status
+    except sqlite3.Error as e:
+        logger.error(f"Ошибка при переключении функции {feature}: {e}")
+        return False  # По умолчанию возвращаем False в случае ошибки

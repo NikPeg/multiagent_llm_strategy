@@ -5,7 +5,7 @@ __init__.py для модуля storage.
 для использования в других модулях приложения.
 """
 
-from .db_manager import db, get_db
+from .db_manager import db, get_db, toggle_feature, get_user_by_telegram_id, update_user_subscription_status
 from .chroma_manager import chroma, get_chroma
 from .schemas import (
     Player,
@@ -35,5 +35,9 @@ __all__ = [
     # Типы для аннотаций
     'StatsDict',
     'StateDict',
-    'PlayerDict'
+    'PlayerDict',
+
+    'get_user_by_telegram_id',
+    'update_user_subscription_status',
+    'toggle_feature',
 ]
