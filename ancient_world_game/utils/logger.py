@@ -247,6 +247,7 @@ def log_memory_usage():
 
 
 # Инициализация логгера при импорте модуля с базовыми настройками
+setup_logger = setup_logging
 _log_dir = 'logs'
 if not os.path.exists(_log_dir):
     os.makedirs(_log_dir)
