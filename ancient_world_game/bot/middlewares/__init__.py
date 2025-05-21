@@ -1,8 +1,6 @@
 from aiogram import Dispatcher
 from .admin_check import AdminCheckMiddleware, admin_required
 from .throttling import ThrottlingMiddleware
-from .action_logger import ActionLoggerMiddleware
-from .user_activity import UserActivityMiddleware
 
 def setup_middlewares(dp: Dispatcher, admin_ids: list):
     """
