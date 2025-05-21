@@ -1,0 +1,53 @@
+# Основные библиотеки для бота
+aiogram==2.20
+python-dotenv==0.19.2
+aioschedule==0.5.2
+
+# Базы данных и хранение
+aiosqlite==0.17.0
+sqlalchemy==1.4.46
+alembic==1.8.1
+asyncpg==0.27.0
+chromadb==0.4.6
+
+# AI и LLM
+langchain==0.0.267
+langchain_community==0.0.10
+sentence-transformers==2.2.2
+torch==2.0.1
+transformers==4.30.2
+tokenizers==0.13.3
+
+# Обработка данных
+numpy==1.24.3
+pandas==2.0.3
+matplotlib==3.7.2
+pydantic==1.10.8
+
+# Утилиты для асинхронной работы
+aiohttp==3.8.4
+aiofiles==23.1.0
+asyncio==3.4.3
+
+# Логирование и мониторинг
+loguru==0.7.0
+prometheus-client==0.17.1
+
+# Веб-сервер для webhook
+uvicorn==0.22.0
+fastapi==0.98.0
+
+# Работа с изображениями и графиками
+pillow==9.5.0
+seaborn==0.12.2
+
+# Обработка текста
+nltk==3.8.1
+spacy==3.6.0
+
+# Утилиты
+tqdm==4.65.0
+tabulate==0.9.0
+python-dateutil==2.8.2
+pytz==2023.3
+cachetools==5.3.1
