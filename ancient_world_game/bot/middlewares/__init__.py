@@ -20,14 +20,6 @@ def setup_middlewares(dp: Dispatcher, admin_ids: list):
     throttling_middleware = ThrottlingMiddleware(limit=0.5)  # 0.5 секунд между сообщениями
     dp.middleware.setup(throttling_middleware)
 
-    # Настройка middleware для логирования действий пользователей
-    action_logger = ActionLoggerMiddleware()
-    dp.middleware.setup(action_logger)
-
-    # Настройка middleware для отслеживания активности пользователей
-    user_activity = UserActivityMiddleware()
-    dp.middleware.setup(user_activity)
-
 # Экспортируем декоратор для удобного импорта
 __all__ = [
     'admin_required',
