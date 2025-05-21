@@ -73,7 +73,7 @@ async def setup_async():
     """
     try:
         # Инициализация базы данных
-        from db import setup_database, create_tables
+        from storage import setup_database, create_tables
         await setup_database()
         await create_tables()
         logger.info("Database initialized successfully")

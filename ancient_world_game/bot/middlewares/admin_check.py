@@ -4,7 +4,7 @@ from aiogram.dispatcher.handler import CancelHandler, current_handler
 from aiogram.utils.exceptions import Throttled
 import logging
 
-from db import get_user_by_telegram_id
+from storage import get_user_by_telegram_id
 
 class AdminCheckMiddleware(BaseMiddleware):
     """

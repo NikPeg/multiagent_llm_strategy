@@ -7,7 +7,7 @@ from io import BytesIO
 import matplotlib.pyplot as plt
 import numpy as np
 
-from db import (
+from storage import (
     get_player_data,
     get_player_by_username,
     update_player_goals,

@@ -6,7 +6,7 @@ import logging
 
 from commands import subscription_cb, process_subscription_callback
 from admin_commands import admin_cb, process_admin_callback, stats_cb, show_stats
-from db import update_user_subscription_status, get_user_by_telegram_id, toggle_feature
+from storage import update_user_subscription_status, get_user_by_telegram_id, toggle_feature
 
 # Callback для настроек уведомлений
 notification_cb = CallbackData("notification", "feature", "status")

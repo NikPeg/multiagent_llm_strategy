@@ -5,7 +5,7 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ReplyKeybo
 from aiogram.utils.callback_data import CallbackData
 import logging
 
-from db import (
+from storage import (
     get_all_users,
     get_subscribers,
     get_active_users,

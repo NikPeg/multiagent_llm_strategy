@@ -5,7 +5,7 @@ from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 import logging
 from datetime import datetime
 
-from db import (
+from storage import (
     get_player_data,
     update_player_stats,
     add_player_action,

@@ -9,7 +9,7 @@ from config.config import ADMIN_IDS
 from .daily_update import process_daily_update
 from .projects_progress import update_projects_progress
 from utils.logger import get_logger
-from db import get_active_players
+from storage import get_active_players
 
 # Инициализация логгера
 logger = get_logger(__name__)
@@ -173,7 +173,7 @@ async def trigger_random_event(bot):
 
                 # Применяем изменения к характеристикам страны
                 if event_impact.get('stats_changes'):
-                    from db import update_player_stats
+                    from storage import update_player_stats
                     await update_player_stats(user_id, **event_impact['stats_changes'])
 
             except Exception as e:

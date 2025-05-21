@@ -4,7 +4,7 @@ from typing import Dict, List, Optional, Any
 import random
 from datetime import datetime, timedelta
 
-from db import (
+from storage import (
     get_active_projects,
     update_project_progress,
     complete_project,
@@ -192,7 +192,7 @@ async def update_projects_progress(bot):
                 logger.error(f"Failed to notify admin {admin_id} about error: {str(ex)}")
 
 async def create_new_project(user_id: int, project_name: str, project_type: str, project_description: str, duration_days: int = 5) -> Dict[str, Any]:
-    from db import create_project
+    from storage import create_project
 
     try:
         player = await get_player_data(user_id)

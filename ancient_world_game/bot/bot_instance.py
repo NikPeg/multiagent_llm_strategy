@@ -7,7 +7,7 @@ from aiogram.contrib.middlewares.logging import LoggingMiddleware
 from config.config import BOT_TOKEN, ADMIN_IDS, WEBHOOK_URL, WEBHOOK_PATH, WEBAPP_HOST, WEBAPP_PORT
 from .middlewares import setup_middlewares
 from .handlers import register_all_handlers
-from db import setup_database, create_tables, check_database_connection
+from storage import setup_database, create_tables, check_database_connection
 from utils.logger import setup_logger
 
 # Настройка логгера

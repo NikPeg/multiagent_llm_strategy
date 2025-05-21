@@ -4,7 +4,7 @@ from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.callback_data import CallbackData
 
-from db import update_user_subscription_status, get_user_by_telegram_id
+from storage import update_user_subscription_status, get_user_by_telegram_id
 from subscription import check_subscription_status
 from broadcast import broadcast_to_subscribers
 
