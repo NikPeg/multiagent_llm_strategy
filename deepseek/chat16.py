@@ -16,18 +16,18 @@ print("=== DeepSeek-R1-Distill-Qwen-32B Chat (FP16)===")
 print("Для выхода напишите 'выход' или 'exit'.\n")
 
 while True:
-    user_input = input("Вы: ")
+    user_input = input("User: ")
     if user_input.lower() in ['выход', 'exit']:
         print("Диалог завершён.")
         break
 
-    history.append(f"Пользователь: {user_input}")
-    context = '\n'.join(history) + "\nМодель:"
+    history.append(f"User: {user_input}")
+    context = '\n'.join(history) + "\nAssistant:"
 
     inputs = tokenizer(context, return_tensors="pt").to(model.device)
     outputs = model.generate(
         **inputs,
-        max_new_tokens=100,
+        max_new_tokens=512,
         do_sample=True,
         temperature=0.7,
         top_p=0.95,
@@ -42,6 +42,6 @@ while True:
     else:
         model_reply = "(Нет ответа)"
 
-    print(f"Модель: {model_reply}")
-    history.append(f"Модель: {model_reply}")
+    print(f"Assistant: {model_reply}")
+    history.append(f"Assistant: {model_reply}")
 
