@@ -1,4 +1,6 @@
 transformers>=4.36.0
 accelerate>=0.21.0
-torch>=2.0.0
 bitsandbytes>=0.42.0
+
+aiogram>=3.0.0b7
+python-dotenv>=1.0.0

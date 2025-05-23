@@ -2,4 +2,9 @@
 game_data.db
 utils/__pycache__/
 .env
-
+bot/__pycache__/
+bot/handlers/__pycache__/
+bot/middlewares/__pycache__/
+chroma_db/
+config/__pycache__/
+storage/__pycache__/
