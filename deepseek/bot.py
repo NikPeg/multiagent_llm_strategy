@@ -20,7 +20,8 @@ tokenizer = AutoTokenizer.from_pretrained(model_name)
 model = AutoModelForCausalLM.from_pretrained(
     model_name,
     device_map="auto",
-    torch_dtype="auto"
+    torch_dtype="auto",
+    use_flash_attention_2=False
 )
 
 bot = Bot(token=BOT_TOKEN)
