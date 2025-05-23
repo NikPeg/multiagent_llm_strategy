@@ -5,6 +5,7 @@ from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from database import init_db, get_history, update_history, clear_history
+import torch
 
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -18,7 +19,7 @@ tokenizer = AutoTokenizer.from_pretrained(model_name)
 model = AutoModelForCausalLM.from_pretrained(
     model_name,
     device_map="auto",
-    torch_dtype="auto",
+    torch_dtype=torch.float16,
     use_flash_attention_2=False
 )
 
