@@ -20,9 +20,13 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 HISTORY_LIMIT = int(os.getenv("HISTORY_LIMIT", 10))
+ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID")  # Получаем ID чата администраторов из .env
 
 if not BOT_TOKEN:
     raise ValueError("Токен бота не найден в .env!")
+
+if not ADMIN_CHAT_ID:
+    logger.warning("ID чата администраторов не найден в .env! Пересылка сообщений будет отключена.")
 
 # Инициализация модели
 model_name = "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B"
@@ -72,44 +76,146 @@ SYSTEM_PROMPT = """
 Не используй шаблонные ответы - каждая ситуация должна быть уникальной.
 """
 
+# Функция для пересылки сообщений администраторам
+async def forward_to_admins(user_message, bot_reply, user_info):
+    if not ADMIN_CHAT_ID:
+        return
+
+    try:
+        admin_notification = (
+            f"📨 Новое сообщение в боте\n\n"
+            f"👤 От пользователя: {user_info}\n\n"
+            f"💬 Сообщение пользователя:\n{user_message}\n\n"
+            f"🤖 Ответ бота:\n{bot_reply}"
+        )
+
+        # Если сообщение слишком длинное, разбиваем его
+        if len(admin_notification) > 4000:
+            # Отправляем информацию о пользователе
+            await bot.send_message(
+                chat_id=ADMIN_CHAT_ID,
+                text=f"📨 Новое сообщение в боте\n\n👤 От пользователя: {user_info}"
+            )
+
+            # Отправляем сообщение пользователя
+            await bot.send_message(
+                chat_id=ADMIN_CHAT_ID,
+                text=f"💬 Сообщение пользователя:\n{user_message}"
+            )
+
+            # Отправляем ответ бота
+            await bot.send_message(
+                chat_id=ADMIN_CHAT_ID,
+                text=f"🤖 Ответ бота:\n{bot_reply}"
+            )
+        else:
+            await bot.send_message(chat_id=ADMIN_CHAT_ID, text=admin_notification)
+
+        logger.info(f"Сообщение пользователя {user_info} переслано администраторам")
+    except Exception as e:
+        logger.error(f"Ошибка при пересылке сообщения администраторам: {str(e)}", exc_info=True)
+
 @dp.message(Command("start"))
 async def start(message: types.Message, state: FSMContext):
+    user_info = f"{message.from_user.full_name} (@{message.from_user.username}, ID: {message.from_user.id})"
+    logger.info(f"Пользователь {user_info} запустил бота")
+
     await clear_history(message.from_user.id)
-    await message.answer(
+
+    reply_text = (
         "🌍 Добро пожаловать в геополитическую РПГ! 🌍\n\n"
         "Здесь вы можете создать и управлять своей страной, взаимодействовать с миром и другими игроками.\n\n"
         "Давайте начнем с создания вашей страны. Как называется ваша страна?"
     )
+
+    await message.answer(reply_text)
+
+    # Пересылаем администраторам
+    if ADMIN_CHAT_ID:
+        await forward_to_admins(
+            "Пользователь запустил бота",
+            reply_text,
+            user_info
+        )
+
     await state.set_state(CountryRegistration.waiting_for_name)
 
 @dp.message(CountryRegistration.waiting_for_name)
 async def process_country_name(message: types.Message, state: FSMContext):
+    user_info = f"{message.from_user.full_name} (@{message.from_user.username}, ID: {message.from_user.id})"
+
     await state.update_data(country_name=message.text)
-    await message.answer(
+
+    reply_text = (
         f"Отлично! Ваша страна называется {message.text}.\n\n"
         "Какая форма правления в вашей стране? (например: демократия, монархия, диктатура и т.д.)"
     )
+
+    await message.answer(reply_text)
+
+    # Пересылаем администраторам
+    if ADMIN_CHAT_ID:
+        await forward_to_admins(
+            f"Название страны: {message.text}",
+            reply_text,
+            user_info
+        )
+
     await state.set_state(CountryRegistration.waiting_for_government)
 
 @dp.message(CountryRegistration.waiting_for_government)
 async def process_government(message: types.Message, state: FSMContext):
+    user_info = f"{message.from_user.full_name} (@{message.from_user.username}, ID: {message.from_user.id})"
+
     await state.update_data(government=message.text)
-    await message.answer(
+    data = await state.get_data()
+
+    reply_text = (
         f"Ваша страна - {message.text}.\n\n"
         "Какими основными ресурсами и индустриями обладает ваша страна?"
     )
+
+    await message.answer(reply_text)
+
+    # Пересылаем администраторам
+    if ADMIN_CHAT_ID:
+        await forward_to_admins(
+            f"Форма правления: {message.text}\nСтрана: {data.get('country_name')}",
+            reply_text,
+            user_info
+        )
+
     await state.set_state(CountryRegistration.waiting_for_resources)
 
 @dp.message(CountryRegistration.waiting_for_resources)
 async def process_resources(message: types.Message, state: FSMContext):
+    user_info = f"{message.from_user.full_name} (@{message.from_user.username}, ID: {message.from_user.id})"
+
     await state.update_data(resources=message.text)
-    await message.answer(
+
+    reply_text = (
         "Какие главные геополитические цели преследует ваша страна? Какие отношения с соседями?"
     )
+
+    await message.answer(reply_text)
+
+    # Пересылаем администраторам
+    if ADMIN_CHAT_ID:
+        data = await state.get_data()
+        await forward_to_admins(
+            f"Ресурсы и индустрии: {message.text}\n"
+            f"Страна: {data.get('country_name')}\n"
+            f"Правление: {data.get('government')}",
+            reply_text,
+            user_info
+        )
+
     await state.set_state(CountryRegistration.waiting_for_goals)
 
 @dp.message(CountryRegistration.waiting_for_goals)
 async def process_goals(message: types.Message, state: FSMContext):
+    user_info = f"{message.from_user.full_name} (@{message.from_user.username}, ID: {message.from_user.id})"
+
     await state.update_data(goals=message.text)
 
     # Получаем все данные
@@ -135,28 +241,52 @@ async def process_goals(message: types.Message, state: FSMContext):
 
     await update_history(message.from_user.id, "Регистрация страны", initial_message, HISTORY_LIMIT)
 
-    await message.answer(
+    reply_text = (
         f"🎉 Поздравляем! Ваша страна {country_name} успешно создана! 🎉\n\n"
         "Теперь вы можете взаимодействовать с миром. Просто опишите свои действия, "
         "планы или задайте вопросы о текущей ситуации.\n\n"
         "Чтобы начать новую игру с другой страной, используйте команду /new."
     )
 
+    await message.answer(reply_text)
+
+    # Пересылаем администраторам полную информацию о стране
+    if ADMIN_CHAT_ID:
+        await forward_to_admins(
+            f"Геополитические цели: {message.text}\n\n"
+            f"СТРАНА ПОЛНОСТЬЮ ЗАРЕГИСТРИРОВАНА:\n{country_description}",
+            reply_text,
+            user_info
+        )
+
     await state.clear()
 
 @dp.message(Command("new"))
 async def new_chat(message: types.Message, state: FSMContext):
+    user_info = f"{message.from_user.full_name} (@{message.from_user.username}, ID: {message.from_user.id})"
+    logger.info(f"Пользователь {user_info} начал новую игру")
+
     await clear_history(message.from_user.id)
-    await message.answer("⚔️ Новая игра начата! Предыдущая история сброшена. ⚔️")
-    await message.answer("Чтобы зарегистрировать новую страну, используйте команду /start")
+    reply_text = "⚔️ Новая игра начата! Предыдущая история сброшена. ⚔️\nЧтобы зарегистрировать новую страну, используйте команду /start"
+
+    await message.answer(reply_text)
+
+    # Пересылаем администраторам
+    if ADMIN_CHAT_ID:
+        await forward_to_admins(
+            "Пользователь сбросил историю и начал новую игру",
+            reply_text,
+            user_info
+        )
 
 @dp.message(F.text)
 async def handle_message(message: types.Message):
     user_id = message.from_user.id
     chat_id = message.chat.id
     user_text = message.text
+    user_info = f"{message.from_user.full_name} (@{message.from_user.username}, ID: {user_id})"
 
-    logger.info(f"Получено сообщение от пользователя {user_id}: {user_text[:50]}...")
+    logger.info(f"Получено сообщение от пользователя {user_info}: {user_text[:50]}...")
     try:
         await bot.send_chat_action(chat_id=chat_id, action="typing")
         loop = asyncio.get_event_loop()
@@ -167,9 +297,25 @@ async def handle_message(message: types.Message):
         typing_task.cancel()
         await message.answer(assistant_reply)
         logger.info(f"Ответ отправлен пользователю {user_id}")
+
+        # Пересылаем сообщение и ответ администраторам
+        if ADMIN_CHAT_ID:
+            await forward_to_admins(user_text, assistant_reply, user_info)
+
     except Exception as e:
+        error_message = f"Ошибка: {str(e)}"
         logger.error(f"Ошибка при обработке сообщения: {str(e)}", exc_info=True)
-        await message.answer(f"Ошибка: {str(e)}")
+        await message.answer(error_message)
+
+        # Уведомляем администраторов об ошибке
+        if ADMIN_CHAT_ID:
+            try:
+                await bot.send_message(
+                    chat_id=ADMIN_CHAT_ID,
+                    text=f"❌ ОШИБКА при обработке сообщения от {user_info}:\n{str(e)}\n\nСообщение пользователя: {user_text}"
+                )
+            except Exception as admin_error:
+                logger.error(f"Не удалось отправить уведомление об ошибке администраторам: {str(admin_error)}")
 
 async def keep_typing(chat_id):
     try:
@@ -221,14 +367,47 @@ def sync_generate_response(user_id, message_text):
 async def main():
     logger.info("Инициализация базы данных...")
     await init_db()
+
+    # Отправляем уведомление о запуске бота
+    if ADMIN_CHAT_ID:
+        try:
+            await bot.send_message(
+                chat_id=ADMIN_CHAT_ID,
+                text=f"🤖 Бот запущен и готов к работе!\n\nВерсия: Геополитическая РПГ\nВремя запуска: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+            )
+        except Exception as e:
+            logger.error(f"Не удалось отправить уведомление о запуске: {str(e)}")
+
     logger.info("Запуск бота...")
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
+    import datetime
+
     try:
         logger.info("Запуск приложения...")
         asyncio.run(main())
     except (KeyboardInterrupt, SystemExit):
         logger.info("Приложение завершено")
+
+        # Отправляем уведомление о завершении работы бота
+        if ADMIN_CHAT_ID:
+            try:
+                asyncio.run(bot.send_message(
+                    chat_id=ADMIN_CHAT_ID,
+                    text=f"🔴 Бот остановлен!\nВремя остановки: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                ))
+            except:
+                pass
     except Exception as e:
         logger.critical(f"Критическая ошибка: {str(e)}", exc_info=True)
+
+        # Отправляем уведомление о критической ошибке
+        if ADMIN_CHAT_ID:
+            try:
+                asyncio.run(bot.send_message(
+                    chat_id=ADMIN_CHAT_ID,
+                    text=f"⛔ КРИТИЧЕСКАЯ ОШИБКА! Бот аварийно остановлен:\n{str(e)}\nВремя: {datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+                ))
+            except:
+                pass
