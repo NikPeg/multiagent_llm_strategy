@@ -295,6 +295,12 @@ async def handle_message(message: types.Message):
         assistant_reply = await loop.run_in_executor(executor, sync_generate_response, user_id, user_text)
         logger.info(f"Ответ сгенерирован для пользователя {user_id}")
         typing_task.cancel()
+
+        # Проверяем, что ответ не пустой
+        if not assistant_reply or assistant_reply.strip() == "":
+            logger.warning(f"Получен пустой ответ от модели для пользователя {user_id}")
+            assistant_reply = "К сожалению, произошла ошибка при генерации ответа. Пожалуйста, попробуйте переформулировать ваш запрос или продолжить взаимодействие."
+
         await message.answer(assistant_reply)
         logger.info(f"Ответ отправлен пользователю {user_id}")
 
@@ -305,7 +311,12 @@ async def handle_message(message: types.Message):
     except Exception as e:
         error_message = f"Ошибка: {str(e)}"
         logger.error(f"Ошибка при обработке сообщения: {str(e)}", exc_info=True)
-        await message.answer(error_message)
+
+        # Отправляем пользователю информацию об ошибке
+        try:
+            await message.answer("Произошла ошибка при обработке вашего запроса. Пожалуйста, попробуйте еще раз позже.")
+        except Exception as reply_error:
+            logger.error(f"Не удалось отправить сообщение об ошибке пользователю: {str(reply_error)}")
 
         # Уведомляем администраторов об ошибке
         if ADMIN_CHAT_ID:
@@ -340,29 +351,47 @@ def sync_generate_response(user_id, message_text):
         context = SYSTEM_PROMPT + "\n\n" + '\n'.join(history + [f"Игрок: {message_text}"]) + "\nСудья игры:"
 
         inputs = tokenizer(context, return_tensors="pt").to(model.device)
-        outputs = model.generate(
-            **inputs,
-            max_new_tokens=512,
-            do_sample=True,
-            temperature=0.7,
-            top_p=0.95,
-            eos_token_id=tokenizer.eos_token_id,
-            pad_token_id=tokenizer.eos_token_id
-        )
-        response = tokenizer.decode(outputs[0], skip_special_tokens=True)
-        assistant_reply = response[len(context):].strip()
 
-        # Обрабатываем многострочный ответ
-        if '\n' in assistant_reply:
-            assistant_reply = '\n'.join([line for line in assistant_reply.split('\n')
-                                         if not line.strip().startswith('Игрок:') and not line.strip().startswith('User:')])
+        try:
+            outputs = model.generate(
+                **inputs,
+                max_new_tokens=512,
+                do_sample=True,
+                temperature=0.7,
+                top_p=0.95,
+                eos_token_id=tokenizer.eos_token_id,
+                pad_token_id=tokenizer.eos_token_id
+            )
+
+            response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+            assistant_reply = response[len(context):].strip()
+
+            # Проверяем, что ответ не пустой
+            if not assistant_reply or assistant_reply.strip() == "":
+                assistant_reply = "Как судья игры, я должен ответить на ваш запрос. Пожалуйста, опишите ваши следующие действия или задайте более конкретный вопрос о текущей ситуации в мире."
+
+            # Обрабатываем многострочный ответ
+            if '\n' in assistant_reply:
+                clean_lines = []
+                for line in assistant_reply.split('\n'):
+                    if not line.strip().startswith('Игрок:') and not line.strip().startswith('User:'):
+                        clean_lines.append(line)
+                assistant_reply = '\n'.join(clean_lines)
+
+            # Последняя проверка на пустой ответ
+            if not assistant_reply or assistant_reply.strip() == "":
+                assistant_reply = "Извините, произошла техническая ошибка. Продолжайте вашу игру, опишите следующие действия вашей страны."
+
+        except Exception as gen_error:
+            logger.error(f"Ошибка при генерации ответа: {str(gen_error)}", exc_info=True)
+            assistant_reply = "Произошла техническая ошибка в работе модели. Пожалуйста, попробуйте еще раз."
 
         loop.run_until_complete(update_history(user_id, message_text, assistant_reply, HISTORY_LIMIT))
         loop.close()
         return assistant_reply
     except Exception as e:
         logger.error(f"Ошибка в generate_response: {str(e)}", exc_info=True)
-        raise
+        return "Извините, произошла внутренняя ошибка. Пожалуйста, попробуйте позже."
 
 async def main():
     logger.info("Инициализация базы данных...")
