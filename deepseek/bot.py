@@ -7,8 +7,8 @@ from aiogram.filters import Command
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from database import init_db, get_history, update_history, clear_history
 import torch
+from concurrent.futures import ThreadPoolExecutor
 
-# Настройка логирования
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
@@ -19,7 +19,6 @@ HISTORY_LIMIT = int(os.getenv("HISTORY_LIMIT", 10))
 if not BOT_TOKEN:
     raise ValueError("Токен бота не найден в .env!")
 
-logger.info("Загрузка модели и токенизатора...")
 model_name = "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B"
 tokenizer = AutoTokenizer.from_pretrained(model_name)
 model = AutoModelForCausalLM.from_pretrained(
@@ -29,11 +28,8 @@ model = AutoModelForCausalLM.from_pretrained(
     use_flash_attention_2=False
 )
 
-# Логирование информации об устройстве
 device_info = f"Модель использует устройство: {model.device}"
 logger.info(device_info)
-
-# Проверка доступности CUDA
 cuda_available = torch.cuda.is_available()
 logger.info(f"CUDA доступен: {cuda_available}")
 
@@ -47,6 +43,8 @@ if cuda_available:
 
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
+
+executor = ThreadPoolExecutor(max_workers=1)
 
 @dp.message(Command("start"))
 async def start(message: types.Message):
@@ -66,67 +64,40 @@ async def handle_message(message: types.Message):
     user_text = message.text
     
     logger.info(f"Получено сообщение от пользователя {user_id}: {user_text[:50]}...")
-    
     try:
-        # Начинаем показывать "печатает..."
         await bot.send_chat_action(chat_id=chat_id, action="typing")
-        
-        # Запускаем генерацию ответа в отдельном таске
-        generation_task = asyncio.create_task(generate_response(user_id, user_text))
-        
-        # Запускаем задачу периодической отправки статуса "печатает..."
+        loop = asyncio.get_event_loop()
         typing_task = asyncio.create_task(keep_typing(chat_id))
-        
-        # Ждем завершения генерации ответа
         logger.info(f"Ожидание генерации ответа для пользователя {user_id}...")
-        assistant_reply = await generation_task
+        assistant_reply = await loop.run_in_executor(executor, sync_generate_response, user_id, user_text)
         logger.info(f"Ответ сгенерирован для пользователя {user_id}")
-        
-        # Останавливаем отправку статуса "печатает..."
         typing_task.cancel()
-        
-        # Отправляем ответ
         await message.answer(assistant_reply)
         logger.info(f"Ответ отправлен пользователю {user_id}")
-        
     except Exception as e:
         logger.error(f"Ошибка при обработке сообщения: {str(e)}", exc_info=True)
         await message.answer(f"Ошибка: {str(e)}")
 
 async def keep_typing(chat_id):
-    """Периодически отправляет статус 'печатает...' в чат"""
     try:
         typing_count = 0
         while True:
             await bot.send_chat_action(chat_id=chat_id, action="typing")
             typing_count += 1
-            logger.debug(f"Отправлен статус typing... для chat_id {chat_id} (#{typing_count})")
-            # Отправляем статус чаще - каждые 3 секунды
             await asyncio.sleep(3)
     except asyncio.CancelledError:
-        logger.debug(f"Задача keep_typing для chat_id {chat_id} отменена после {typing_count} отправок")
         pass
     except Exception as e:
         logger.error(f"Ошибка в keep_typing: {str(e)}", exc_info=True)
 
-async def generate_response(user_id, message_text):
-    """Генерирует ответ модели"""
+def sync_generate_response(user_id, message_text):
+    import asyncio
     try:
-        if torch.cuda.is_available():
-            logger.info(f"Перед генерацией: {torch.cuda.memory_allocated() / 1024**2:.2f} МБ GPU используется")
-            logger.info(f"Перед генерацией: {torch.cuda.memory_reserved() / 1024**2:.2f} МБ GPU зарезервировано")
-        
-        start_time = asyncio.get_event_loop().time()
-        logger.info(f"Получение истории для пользователя {user_id}")
-        history = await get_history(user_id)
-        
-        logger.info(f"Подготовка контекста для пользователя {user_id}")
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        history = loop.run_until_complete(get_history(user_id))
         context = '\n'.join(history + [f"User: {message_text}"]) + "\nAssistant:"
-        
-        logger.info(f"Токенизация ввода для пользователя {user_id}")
         inputs = tokenizer(context, return_tensors="pt").to(model.device)
-        
-        logger.info(f"Начало генерации ответа для пользователя {user_id}")
         outputs = model.generate(
             **inputs,
             max_new_tokens=512,
@@ -136,23 +107,10 @@ async def generate_response(user_id, message_text):
             eos_token_id=tokenizer.eos_token_id,
             pad_token_id=tokenizer.eos_token_id
         )
-        
-        logger.info(f"Декодирование ответа для пользователя {user_id}")
         response = tokenizer.decode(outputs[0], skip_special_tokens=True)
         assistant_reply = response[len(context):].strip().split('\n')[0]
-        
-        end_time = asyncio.get_event_loop().time()
-        generation_time = end_time - start_time
-        logger.info(f"Генерация заняла {generation_time:.2f} секунд для пользователя {user_id}")
-        
-        if torch.cuda.is_available():
-            logger.info(f"После генерации: {torch.cuda.memory_allocated() / 1024**2:.2f} МБ GPU используется")
-            logger.info(f"После генерации: {torch.cuda.memory_reserved() / 1024**2:.2f} МБ GPU зарезервировано")
-        
-        # Обновляем историю
-        logger.info(f"Обновление истории для пользователя {user_id}")
-        await update_history(user_id, message_text, assistant_reply, HISTORY_LIMIT)
-        
+        loop.run_until_complete(update_history(user_id, message_text, assistant_reply, HISTORY_LIMIT))
+        loop.close()
         return assistant_reply
     except Exception as e:
         logger.error(f"Ошибка в generate_response: {str(e)}", exc_info=True)
