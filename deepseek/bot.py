@@ -2,16 +2,16 @@ import asyncio
 import logging
 from dotenv import load_dotenv
 import os
+import datetime
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.fsm.state import State, StatesGroup
-from transformers import AutoModelForCausalLM, AutoTokenizer
-from database import init_db, get_history, update_history, clear_history
-import torch
 from concurrent.futures import ThreadPoolExecutor
-import datetime
+
+from model_handler import sync_generate_response, init_model
+from database import init_db, get_history, update_history, clear_history
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 HISTORY_LIMIT = int(os.getenv("HISTORY_LIMIT", 10))
-ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID")  # Получаем ID чата администраторов из .env
+ADMIN_CHAT_ID = os.getenv("ADMIN_CHAT_ID")
 
 if not BOT_TOKEN:
     raise ValueError("Токен бота не найден в .env!")
@@ -30,28 +30,7 @@ if not ADMIN_CHAT_ID:
     logger.warning("ID чата администраторов не найден в .env! Пересылка сообщений будет отключена.")
 
 # Инициализация модели
-model_name = "deepseek-ai/DeepSeek-R1-Distill-Qwen-32B"
-tokenizer = AutoTokenizer.from_pretrained(model_name)
-model = AutoModelForCausalLM.from_pretrained(
-    model_name,
-    device_map="auto",
-    torch_dtype=torch.float16,
-    use_flash_attention_2=False
-)
-
-# Логирование информации об устройстве
-device_info = f"Модель использует устройство: {model.device}"
-logger.info(device_info)
-cuda_available = torch.cuda.is_available()
-logger.info(f"CUDA доступен: {cuda_available}")
-
-if cuda_available:
-    cuda_device_count = torch.cuda.device_count()
-    cuda_device_name = torch.cuda.get_device_name(0) if cuda_device_count > 0 else "Нет"
-    logger.info(f"Количество GPU: {cuda_device_count}")
-    logger.info(f"Название GPU: {cuda_device_name}")
-    logger.info(f"Текущее использование GPU памяти: {torch.cuda.memory_allocated() / 1024**2:.2f} МБ")
-    logger.info(f"Максимальная доступная GPU память: {torch.cuda.get_device_properties(0).total_memory / 1024**2:.2f} МБ")
+model, tokenizer = init_model()
 
 # Инициализация бота
 bot = Bot(token=BOT_TOKEN)
@@ -60,7 +39,7 @@ dp = Dispatcher(storage=storage)
 
 executor = ThreadPoolExecutor(max_workers=1)
 
-# Определение состояний для FSM (упрощенная версия)
+# Определение состояний для FSM
 class CountryRegistration(StatesGroup):
     waiting_for_name = State()
     waiting_for_description = State()
@@ -226,6 +205,18 @@ async def new_chat(message: types.Message, state: FSMContext):
             user_info
         )
 
+async def keep_typing(chat_id):
+    try:
+        typing_count = 0
+        while True:
+            await bot.send_chat_action(chat_id=chat_id, action="typing")
+            typing_count += 1
+            await asyncio.sleep(3)
+    except asyncio.CancelledError:
+        pass
+    except Exception as e:
+        logger.error(f"Ошибка в keep_typing: {str(e)}", exc_info=True)
+
 @dp.message(F.text)
 async def handle_message(message: types.Message):
     user_id = message.from_user.id
@@ -239,7 +230,14 @@ async def handle_message(message: types.Message):
         loop = asyncio.get_event_loop()
         typing_task = asyncio.create_task(keep_typing(chat_id))
         logger.info(f"Ожидание генерации ответа для пользователя {user_id}...")
-        assistant_reply = await loop.run_in_executor(executor, sync_generate_response, user_id, user_text)
+
+        # Передаем глобальные объекты в функцию
+        assistant_reply = await loop.run_in_executor(
+            executor,
+            sync_generate_response,
+            user_id, user_text, SYSTEM_PROMPT, model, tokenizer, HISTORY_LIMIT
+        )
+
         logger.info(f"Ответ сгенерирован для пользователя {user_id}")
         typing_task.cancel()
 
@@ -274,71 +272,6 @@ async def handle_message(message: types.Message):
                 )
             except Exception as admin_error:
                 logger.error(f"Не удалось отправить уведомление об ошибке администраторам: {str(admin_error)}")
-
-async def keep_typing(chat_id):
-    try:
-        typing_count = 0
-        while True:
-            await bot.send_chat_action(chat_id=chat_id, action="typing")
-            typing_count += 1
-            await asyncio.sleep(3)
-    except asyncio.CancelledError:
-        pass
-    except Exception as e:
-        logger.error(f"Ошибка в keep_typing: {str(e)}", exc_info=True)
-
-def sync_generate_response(user_id, message_text):
-    import asyncio
-    try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        history = loop.run_until_complete(get_history(user_id))
-
-        # Добавляем системный промпт к контексту
-        context = SYSTEM_PROMPT + "\n\n" + '\n'.join(history + [f"Игрок: {message_text}"]) + "\nСудья игры:"
-
-        inputs = tokenizer(context, return_tensors="pt").to(model.device)
-
-        try:
-            outputs = model.generate(
-                **inputs,
-                max_new_tokens=512,
-                do_sample=True,
-                temperature=0.7,
-                top_p=0.95,
-                eos_token_id=tokenizer.eos_token_id,
-                pad_token_id=tokenizer.eos_token_id
-            )
-
-            response = tokenizer.decode(outputs[0], skip_special_tokens=True)
-            assistant_reply = response[len(context):].strip()
-
-            # Проверяем, что ответ не пустой
-            if not assistant_reply or assistant_reply.strip() == "":
-                assistant_reply = "Как судья игры, я должен ответить на ваш запрос. Пожалуйста, опишите ваши следующие действия или задайте более конкретный вопрос о текущей ситуации в мире."
-
-            # Обрабатываем многострочный ответ
-            if '\n' in assistant_reply:
-                clean_lines = []
-                for line in assistant_reply.split('\n'):
-                    if not line.strip().startswith('Игрок:') and not line.strip().startswith('User:'):
-                        clean_lines.append(line)
-                assistant_reply = '\n'.join(clean_lines)
-
-            # Последняя проверка на пустой ответ
-            if not assistant_reply or assistant_reply.strip() == "":
-                assistant_reply = "Извините, произошла техническая ошибка. Продолжайте вашу игру, опишите следующие действия вашей страны."
-
-        except Exception as gen_error:
-            logger.error(f"Ошибка при генерации ответа: {str(gen_error)}", exc_info=True)
-            assistant_reply = "Произошла техническая ошибка в работе модели. Пожалуйста, попробуйте еще раз."
-
-        loop.run_until_complete(update_history(user_id, message_text, assistant_reply, HISTORY_LIMIT))
-        loop.close()
-        return assistant_reply
-    except Exception as e:
-        logger.error(f"Ошибка в generate_response: {str(e)}", exc_info=True)
-        return "Извините, произошла внутренняя ошибка. Пожалуйста, попробуйте позже."
 
 async def main():
     logger.info("Инициализация базы данных...")
