@@ -164,13 +164,12 @@ async def keep_typing(chat_id):
 
 def sync_generate_response(user_id, message_text, country_name=None, country_desc=None):
     import asyncio
-    from database import get_history, update_history  # Импортируем здесь, если spawn subprocess
+    from database import get_history, update_history  # Импортируем здесь для процесса
     try:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         history = loop.run_until_complete(get_history(user_id))
 
-        # Собираем специальный игровой контекст (с учётом страны):
         context_prompts = [RPG_PROMPT]
         if country_name and country_desc:
             context_prompts.append(
@@ -190,16 +189,8 @@ def sync_generate_response(user_id, message_text, country_name=None, country_des
         )
         response = tokenizer.decode(outputs[0], skip_special_tokens=True)
 
-        # Обрезаем только ответ после Assistant:
-        ai_response = response[len(context):].strip()
-
-        # Обрезаем по ключевым словам, если они встречаются
-        stop_words = ['User:', 'Игрок:', 'Player:']
-        # regexp для любого из вариантов в начале строки (или после \n)
-        pattern = re.compile(r'(User:|Игрок:|Player:)', re.IGNORECASE)
-        m = pattern.search(ai_response)
-        if m:
-            ai_response = ai_response[:m.start()].rstrip()
+        # Чистим ответ ассистента
+        ai_response = clean_ai_response(response[len(context):].strip())
 
         loop.run_until_complete(update_history(user_id, message_text, ai_response, HISTORY_LIMIT))
         loop.close()
