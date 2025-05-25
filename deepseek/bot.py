@@ -13,6 +13,7 @@ from database import (
 )
 import torch
 from concurrent.futures import ThreadPoolExecutor
+import re
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -163,7 +164,7 @@ async def keep_typing(chat_id):
 
 def sync_generate_response(user_id, message_text, country_name=None, country_desc=None):
     import asyncio
-    from database import get_history, update_history  # Импортируем, иначе не найдёт при spawn subprocess
+    from database import get_history, update_history  # Импортируем здесь, если spawn subprocess
     try:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
@@ -173,7 +174,7 @@ def sync_generate_response(user_id, message_text, country_name=None, country_des
         context_prompts = [RPG_PROMPT]
         if country_name and country_desc:
             context_prompts.append(
-                f"Игрок управляет страной \"{country_name}\". Описание страны: {country_desc}"
+                f'Игрок управляет страной "{country_name}". Описание страны: {country_desc}'
             )
         context = '\n'.join(context_prompts + history + [f"User: {message_text}"]) + "\nAssistant:"
 
@@ -188,8 +189,18 @@ def sync_generate_response(user_id, message_text, country_name=None, country_des
             pad_token_id=tokenizer.eos_token_id
         )
         response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+
         # Обрезаем только ответ после Assistant:
         ai_response = response[len(context):].strip()
+
+        # Обрезаем по ключевым словам, если они встречаются
+        stop_words = ['User:', 'Игрок:', 'Player:']
+        # regexp для любого из вариантов в начале строки (или после \n)
+        pattern = re.compile(r'(User:|Игрок:|Player:)', re.IGNORECASE)
+        m = pattern.search(ai_response)
+        if m:
+            ai_response = ai_response[:m.start()].rstrip()
+
         loop.run_until_complete(update_history(user_id, message_text, ai_response, HISTORY_LIMIT))
         loop.close()
         return ai_response, context
