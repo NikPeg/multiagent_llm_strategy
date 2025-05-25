@@ -19,25 +19,6 @@ async def init_db():
                 country_desc TEXT
             )"""
         )
-        # Новая таблица для подробного состояния страны
-        await db.execute(
-            """CREATE TABLE IF NOT EXISTS countries (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER,
-                name TEXT,
-                gold INTEGER DEFAULT 0,
-                population INTEGER DEFAULT 0,
-                army INTEGER DEFAULT 0,
-                food INTEGER DEFAULT 0,
-                territory INTEGER DEFAULT 0,
-                religion TEXT,
-                economy TEXT,
-                diplomacy TEXT,
-                resources TEXT,
-                summary TEXT, -- краткое текстовое описание, если потребуется
-                UNIQUE(name)
-            )"""
-        )
         await db.commit()
 
 # ==== История чатов ====
@@ -141,39 +122,3 @@ async def clear_user_state(user_id: int):
     async with aiosqlite.connect("chats.db") as db:
         await db.execute("DELETE FROM user_states WHERE user_id = ?", (user_id,))
         await db.commit()
-
-async def create_country(user_id: int, name: str, gold=0, population=0, army=0, food=0,
-                         territory=0, religion='', economy='', diplomacy='', resources='', summary=''):
-    async with aiosqlite.connect("chats.db") as db:
-        await db.execute(
-            """INSERT INTO countries 
-            (user_id, name, gold, population, army, food, territory, religion, economy, diplomacy, resources, summary)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (user_id, name, gold, population, army, food, territory, religion, economy, diplomacy, resources, summary)
-        )
-        await db.commit()
-
-async def get_country_by_name(name: str):
-    async with aiosqlite.connect("chats.db") as db:
-        async with db.execute("SELECT * FROM countries WHERE name = ?", (name,)) as cursor:
-            row = await cursor.fetchone()
-            return row  # возвращает кортеж
-
-async def get_country_by_user(user_id: int):
-    async with aiosqlite.connect("chats.db") as db:
-        async with db.execute("SELECT * FROM countries WHERE user_id = ?", (user_id,)) as cursor:
-            row = await cursor.fetchone()
-            return row
-
-async def update_country_param(name: str, **params):
-    keys = ", ".join([f"{k} = ?" for k in params])
-    values = list(params.values())
-    values.append(name)
-    async with aiosqlite.connect("chats.db") as db:
-        await db.execute(f"UPDATE countries SET {keys} WHERE name = ?", values)
-        await db.commit()
-
-async def get_all_countries():
-    async with aiosqlite.connect("chats.db") as db:
-        async with db.execute("SELECT * FROM countries") as cursor:
-            return await cursor.fetchall()

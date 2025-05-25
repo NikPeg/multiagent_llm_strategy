@@ -5,11 +5,16 @@ import os
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from database import *
+from database import (
+    init_db, get_history, update_history, clear_history,
+    get_user_state, set_user_state, clear_user_state,
+    get_user_country, set_user_country,
+    get_user_country_desc, set_user_country_desc
+)
 import torch
 from concurrent.futures import ThreadPoolExecutor
+import re
 from parsing import *
-from rag import *
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -108,86 +113,6 @@ async def handle_country_desc(message: types.Message, user_id: int, user_text: s
     await set_user_country_desc(user_id, user_text.strip())
     await set_user_state(user_id, None)  # Сбросить состояние
     country = await get_user_country(user_id)
-
-    # Включаем "типинг"
-    typing_task = asyncio.create_task(keep_typing(message.chat.id))
-
-    # 1. Формируем prompt для извлечения параметров из LLM (RAG)
-    extract_prompt = (
-        f"Описание государства: {user_text.strip()}\n"
-        f"На основе этого описания оцени параметры новой страны в древнем мире. "
-        f"В числовых параметрах (gold, population, army, food, territory) пиши только числа. "
-        f"В параметрах-religion, economy, diplomacy, resources — короткая фраза.\n"
-        f"Ответ строго в формате JSON без комментариев и лишнего текста!\n"
-        "{\n"
-        "  \"gold\": ..., \"population\": ..., \"army\": ..., \"food\": ..., \"territory\": ..., "
-        "\"religion\": \"...\", \"economy\": \"...\", \"diplomacy\": \"...\", \"resources\": \"...\"\n"
-        "}\n"
-    )
-
-    # 2. Спрашиваем у локальной LLM
-    loop = asyncio.get_event_loop()
-    params_json = await loop.run_in_executor(None, generate_country_params, extract_prompt)
-
-    # 3. Парсим ответ модели (ожидается строковый JSON)
-    import json
-    import re
-    try:
-        # Убираем все спецтеги, что может вернуть модель
-        cleaned = params_json.replace("&lt;/think&gt;", "").replace("</think>", "")
-        # Ищем все JSON-блоки
-        matches = re.findall(r'\{[\s\S]+?\}', cleaned)
-        d = None
-        for candidate in matches:
-            try:
-                v = json.loads(candidate)
-                # Проверяем, что gold и population и другие числовые — действительно числа
-                if all(isinstance(v.get(field), (int, float)) for field in ['gold', 'population', 'army', 'food', 'territory']):
-                    d = v
-                    break
-            except Exception:
-                continue
-        if d is None:
-            logger.error(f"Не удалось разобрать параметры страны из LLM: {params_json}")
-            d = dict(gold=0, population=0, army=0, food=0, territory=0,
-                     religion="", economy="", diplomacy="", resources="")
-    except Exception as e:
-        logger.error(f"Ошибка разбора параметров страны из LLM: {params_json} [{str(e)}]", exc_info=True)
-        d = dict(gold=0, population=0, army=0, food=0, territory=0,
-                 religion="", economy="", diplomacy="", resources="")
-
-    # 4. Создаём страну в БД!
-    await create_country(
-        user_id=user_id,
-        name=country,
-        gold=d.get('gold', 0),
-        population=d.get('population', 0),
-        army=d.get('army', 0),
-        food=d.get('food', 0),
-        territory=d.get('territory', 0),
-        religion=d.get('religion', ""),
-        economy=d.get('economy', ""),
-        diplomacy=d.get('diplomacy', ""),
-        resources=d.get('resources', ""),
-        summary=user_text.strip(),
-    )
-
-    # Останавливаем typing
-    typing_task.cancel()
-
-    # Пересылаем описание и параметры админу
-    admin_msg = (
-        f"🛡 Новый игрок создал страну <b>{country}</b>!\n"
-        f"<b>Описание:</b> <pre>{user_text.strip()}</pre>\n"
-        f"<b>Параметры от модели:</b> <pre>{d}</pre>\n"
-        f"<b>Ответ модели:</b> <pre>{cleaned}</pre>"
-    )
-    await bot.send_message(
-        ADMIN_CHAT_ID,
-        admin_msg,
-        parse_mode='HTML'
-    )
-
     await message.answer(
         f"Описание страны сохранено. Игра начата!\n"
         f"Действуй как правитель страны <b>{country}</b>.\n"
@@ -196,24 +121,6 @@ async def handle_country_desc(message: types.Message, user_id: int, user_text: s
         "\n\nЧто будешь делать первым делом?",
         parse_mode="HTML"
     )
-
-
-def generate_country_params(prompt):
-    """
-    Вспомогательная функция для sync вызова генерации параметров страны моделью.
-    """
-    inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
-    outputs = model.generate(
-        **inputs,
-        max_new_tokens=256,
-        do_sample=True,
-        temperature=0.7,
-        top_p=0.95,
-        eos_token_id=tokenizer.eos_token_id,
-        pad_token_id=tokenizer.eos_token_id
-    )
-    response = tokenizer.decode(outputs[0], skip_special_tokens=True)
-    return response
 
 async def handle_game_dialog(message: types.Message, user_id: int, user_text: str):
     chat_id = message.chat.id
@@ -224,14 +131,10 @@ async def handle_game_dialog(message: types.Message, user_id: int, user_text: st
         loop = asyncio.get_event_loop()
         typing_task = asyncio.create_task(keep_typing(chat_id))
         logger.info(f"Ожидание генерации ответа для пользователя {user_id}...")
-
-        # --- RAG retrieval ---
-        rag_info = await get_rag_context(user_id, user_text)
-        context = build_prompt(user_id, user_text, rag_info)
-
-        # --- LLM generation ---
-        assistant_reply = await loop.run_in_executor(
-            executor, sync_generate_response_rag, context
+        country_name = await get_user_country(user_id)
+        country_desc = await get_user_country_desc(user_id)
+        assistant_reply, context = await loop.run_in_executor(
+            executor, sync_generate_response, user_id, user_text, country_name, country_desc
         )
         logger.info(f"Ответ сгенерирован для пользователя {user_id}")
         typing_task.cancel()
@@ -267,8 +170,21 @@ async def keep_typing(chat_id):
     except Exception as e:
         logger.error(f"Ошибка в keep_typing: {str(e)}", exc_info=True)
 
-def sync_generate_response_rag(context: str) -> str:
+def sync_generate_response(user_id, message_text, country_name=None, country_desc=None):
+    import asyncio
+    from database import get_history, update_history  # Импортируем здесь для процесса
     try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        history = loop.run_until_complete(get_history(user_id))
+
+        context_prompts = [RPG_PROMPT]
+        if country_name and country_desc:
+            context_prompts.append(
+                f'Игрок управляет страной "{country_name}". Описание страны: {country_desc}'
+            )
+        context = '\n'.join(context_prompts + history + [f"Игрок: {message_text}"]) + "\nАссистент:"
+
         inputs = tokenizer(context, return_tensors="pt").to(model.device)
         outputs = model.generate(
             **inputs,
@@ -280,10 +196,15 @@ def sync_generate_response_rag(context: str) -> str:
             pad_token_id=tokenizer.eos_token_id
         )
         response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+        # Чистим ответ ассистента
         ai_response = clean_ai_response(response[len(context):].strip())
-        return ai_response
+
+        loop.run_until_complete(update_history(user_id, message_text, ai_response, HISTORY_LIMIT))
+        loop.close()
+        return ai_response, context
     except Exception as e:
-        logger.error(f"Ошибка в sync_generate_response_rag: {str(e)}", exc_info=True)
+        logger.error(f"Ошибка в generate_response: {str(e)}", exc_info=True)
         raise
 
 async def main():
