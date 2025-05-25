@@ -13,8 +13,8 @@ from database import (
 )
 import torch
 from concurrent.futures import ThreadPoolExecutor
-import re
 from parsing import *
+from rag import *
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -131,10 +131,14 @@ async def handle_game_dialog(message: types.Message, user_id: int, user_text: st
         loop = asyncio.get_event_loop()
         typing_task = asyncio.create_task(keep_typing(chat_id))
         logger.info(f"Ожидание генерации ответа для пользователя {user_id}...")
-        country_name = await get_user_country(user_id)
-        country_desc = await get_user_country_desc(user_id)
-        assistant_reply, context = await loop.run_in_executor(
-            executor, sync_generate_response, user_id, user_text, country_name, country_desc
+
+        # --- RAG retrieval ---
+        rag_info = await get_rag_context(user_id, user_text)
+        context = build_prompt(user_id, user_text, rag_info)
+
+        # --- LLM generation ---
+        assistant_reply = await loop.run_in_executor(
+            executor, sync_generate_response_rag, context
         )
         logger.info(f"Ответ сгенерирован для пользователя {user_id}")
         typing_task.cancel()
@@ -170,21 +174,8 @@ async def keep_typing(chat_id):
     except Exception as e:
         logger.error(f"Ошибка в keep_typing: {str(e)}", exc_info=True)
 
-def sync_generate_response(user_id, message_text, country_name=None, country_desc=None):
-    import asyncio
-    from database import get_history, update_history  # Импортируем здесь для процесса
+def sync_generate_response_rag(context: str) -> str:
     try:
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        history = loop.run_until_complete(get_history(user_id))
-
-        context_prompts = [RPG_PROMPT]
-        if country_name and country_desc:
-            context_prompts.append(
-                f'Игрок управляет страной "{country_name}". Описание страны: {country_desc}'
-            )
-        context = '\n'.join(context_prompts + history + [f"Игрок: {message_text}"]) + "\nАссистент:"
-
         inputs = tokenizer(context, return_tensors="pt").to(model.device)
         outputs = model.generate(
             **inputs,
@@ -196,15 +187,10 @@ def sync_generate_response(user_id, message_text, country_name=None, country_des
             pad_token_id=tokenizer.eos_token_id
         )
         response = tokenizer.decode(outputs[0], skip_special_tokens=True)
-
-        # Чистим ответ ассистента
         ai_response = clean_ai_response(response[len(context):].strip())
-
-        loop.run_until_complete(update_history(user_id, message_text, ai_response, HISTORY_LIMIT))
-        loop.close()
-        return ai_response, context
+        return ai_response
     except Exception as e:
-        logger.error(f"Ошибка в generate_response: {str(e)}", exc_info=True)
+        logger.error(f"Ошибка в sync_generate_response_rag: {str(e)}", exc_info=True)
         raise
 
 async def main():
