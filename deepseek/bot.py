@@ -5,7 +5,12 @@ import os
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from database import init_db, get_history, update_history, clear_history
+from database import (
+    init_db, get_history, update_history, clear_history,
+    get_user_state, set_user_state, clear_user_state,
+    get_user_country, set_user_country,
+    get_user_country_desc, set_user_country_desc
+)
 import torch
 from concurrent.futures import ThreadPoolExecutor
 
@@ -47,11 +52,6 @@ dp = Dispatcher()
 
 executor = ThreadPoolExecutor(max_workers=1)
 
-# user_state хранит промежуточные этапы знакомства для старта
-user_state = {}
-user_country = {}    # user_id: country_name
-user_country_desc = {}  # user_id: country_description
-
 # Промпт для ролевого режима (передадим в модель первым контекстом!)
 RPG_PROMPT = (
     "Ты — ведущий ролевой текстовой игры в стиле геополитики древнего мира. "
@@ -66,8 +66,10 @@ RPG_PROMPT = (
 @dp.message(Command("start"))
 async def start(message: types.Message):
     user_id = message.from_user.id
-    user_state[user_id] = 'waiting_for_country_name'
     await clear_history(user_id)
+    await set_user_state(user_id, 'waiting_for_country_name')
+    await set_user_country(user_id, None)
+    await set_user_country_desc(user_id, None)
     await message.answer(
         "Добро пожаловать в ролевую геополитическую игру эпохи древнего мира!\n\n"
         "Для начала игры укажи название своей страны:"
@@ -75,7 +77,11 @@ async def start(message: types.Message):
 
 @dp.message(Command("new"))
 async def new_chat(message: types.Message):
-    await clear_history(message.from_user.id)
+    user_id = message.from_user.id
+    await clear_history(user_id)
+    await clear_user_state(user_id)
+    await set_user_country(user_id, None)
+    await set_user_country_desc(user_id, None)
     await message.answer("⚔️ Контекст диалога сброшен!⚔️")
 
 @dp.message(F.text)
@@ -85,30 +91,32 @@ async def handle_message(message: types.Message):
     user_text = message.text
     user_name = message.from_user.username
 
-    # Логика сбора имени страны/описания
-    if user_id in user_state:
-        state = user_state[user_id]
-        if state == 'waiting_for_country_name':
-            user_country[user_id] = user_text.strip()
-            user_state[user_id] = 'waiting_for_country_desc'
-            await message.answer(
-                f"Название страны: <b>{user_text.strip()}</b>\n\n"
-                f"Теперь опиши кратко свою страну (география, особенности, народ, культура, стартовые условия):",
-                parse_mode="HTML"
-            )
-            return
-        elif state == 'waiting_for_country_desc':
-            user_country_desc[user_id] = user_text.strip()
-            del user_state[user_id]
-            await message.answer(
-                f"Описание страны сохранено. Игра начата!\n"
-                f"Действуй как правитель страны <b>{user_country[user_id]}</b>.\n"
-                f"Ты можешь отдавать приказы, объявлять войны, строить города или устанавливать отношения с другими странами.\n"
-                f"В любой момент используй /new чтобы сбросить контекст."
-                "\n\nЧто будешь делать первым делом?"
-                , parse_mode="HTML"
-            )
-            return
+    # Получаем текущее состояние из БД
+    state = await get_user_state(user_id)
+
+    if state == 'waiting_for_country_name':
+        await set_user_country(user_id, user_text.strip())
+        await set_user_state(user_id, 'waiting_for_country_desc')
+        await message.answer(
+            f"Название страны: <b>{user_text.strip()}</b>\n\n"
+            f"Теперь опиши кратко свою страну (география, особенности, народ, культура, стартовые условия):",
+            parse_mode="HTML"
+        )
+        return
+
+    elif state == 'waiting_for_country_desc':
+        await set_user_country_desc(user_id, user_text.strip())
+        await set_user_state(user_id, None)  # Сбросить состояние
+        country = await get_user_country(user_id)
+        await message.answer(
+            f"Описание страны сохранено. Игра начата!\n"
+            f"Действуй как правитель страны <b>{country}</b>.\n"
+            f"Ты можешь отдавать приказы, объявлять войны, строить города или устанавливать отношения с другими странами.\n"
+            f"В любой момент используй /new чтобы сбросить контекст."
+            "\n\nЧто будешь делать первым делом?"
+            , parse_mode="HTML"
+        )
+        return
 
     # Если не идёт этап знакомства — обычный игровой диалог
     logger.info(f"Получено сообщение от пользователя {user_id} {user_name}: {user_text[:50]}...")
@@ -117,9 +125,10 @@ async def handle_message(message: types.Message):
         loop = asyncio.get_event_loop()
         typing_task = asyncio.create_task(keep_typing(chat_id))
         logger.info(f"Ожидание генерации ответа для пользователя {user_id}...")
+        # Получаем страну и описание из БД
+        country_name = await get_user_country(user_id)
+        country_desc = await get_user_country_desc(user_id)
         # Передаём их страну и описание для расширения промпта
-        country_name = user_country.get(user_id, None)
-        country_desc = user_country_desc.get(user_id, None)
         assistant_reply, context = await loop.run_in_executor(
             executor, sync_generate_response, user_id, user_text, country_name, country_desc
         )
@@ -154,6 +163,7 @@ async def keep_typing(chat_id):
 
 def sync_generate_response(user_id, message_text, country_name=None, country_desc=None):
     import asyncio
+    from database import get_history, update_history  # Импортируем, иначе не найдёт при spawn subprocess
     try:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
