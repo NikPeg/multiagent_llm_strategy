@@ -23,6 +23,7 @@ load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID"))
 HISTORY_LIMIT = int(os.getenv("HISTORY_LIMIT", 4))
+MAX_NEW_TOKENS = int(os.getenv("MAX_NEW_TOKENS"), 512)
 
 if not BOT_TOKEN:
     raise ValueError("Токен бота не найден в .env!")
@@ -182,12 +183,12 @@ def sync_generate_response(user_id, message_text, country_name=None, country_des
             context_prompts.append(
                 f'Игрок управляет страной "{country_name}". Описание страны: {country_desc}'
             )
-        context = '\n'.join(context_prompts + history + [f"User: {message_text}"]) + "\nAssistant:"
+        context = '\n'.join(context_prompts + history + [f"Игрок: {message_text}"]) + "\nАссистент:"
 
         inputs = tokenizer(context, return_tensors="pt").to(model.device)
         outputs = model.generate(
             **inputs,
-            max_new_tokens=250,
+            max_new_tokens=MAX_NEW_TOKENS,
             do_sample=True,
             temperature=0.7,
             top_p=0.95,
