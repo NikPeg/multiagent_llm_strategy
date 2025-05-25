@@ -109,12 +109,12 @@ async def handle_message(message: types.Message):
                 , parse_mode="HTML"
             )
             # Запишем стартовый промпт ролевой и вводные игрока в историю
-            intro_prompt = (
-                f"{RPG_PROMPT}\n\n"
-                f"Игрок управляет страной \"{user_country[user_id]}\".\n"
-                f"Описание страны от игрока: {user_country_desc[user_id]}\n"
-            )
-            await update_history(user_id, "СТАРТ", intro_prompt, HISTORY_LIMIT)
+            # intro_prompt = (
+            #     f"{RPG_PROMPT}\n\n"
+            #     f"Игрок управляет страной \"{user_country[user_id]}\".\n"
+            #     f"Описание страны от игрока: {user_country_desc[user_id]}\n"
+            # )
+            # await update_history(user_id, "СТАРТ", intro_prompt, HISTORY_LIMIT)
             return
 
     # Если не идёт этап знакомства — обычный игровой диалог
