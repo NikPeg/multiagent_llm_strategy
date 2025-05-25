@@ -58,10 +58,10 @@ def sync_generate_response(user_id, message_text, system_prompt, model, tokenize
 
         # Формируем промпт с историей и системным промптом
         if formatted_history:
-            context = f"{system_prompt}\n\n{formatted_history}\nPlayer: {message_text}\nGame referee:"
+            context = f"{system_prompt}\n\n{formatted_history}\nPlayer: {message_text}\nAssistant:"
         else:
             # Если истории нет, используем только текущее сообщение
-            context = f"{system_prompt}\n\nPlayer: {message_text}\nGame referee:"
+            context = f"{system_prompt}\n\nPlayer: {message_text}\nAssistant:"
 
         logger.debug(f"Контекст для модели: {context[:200]}...")
 
@@ -72,7 +72,7 @@ def sync_generate_response(user_id, message_text, system_prompt, model, tokenize
             # Генерируем ответ
             outputs = model.generate(
                 **inputs,
-                max_new_tokens=150,
+                max_new_tokens=512,
                 do_sample=True,
                 temperature=0.7,
                 top_p=0.95,
