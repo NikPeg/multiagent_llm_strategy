@@ -180,7 +180,7 @@ async def handle_country_desc(message: types.Message, user_id: int, user_text: s
         f"🛡 Новый игрок создал страну <b>{country}</b>!\n"
         f"<b>Описание:</b> <pre>{user_text.strip()}</pre>\n"
         f"<b>Параметры от модели:</b> <pre>{d}</pre>\n"
-        f"<b>Ответ модели (сырое):</b> <pre>{params_json}</pre>"
+        f"<b>Ответ модели:</b> <pre>{cleaned}</pre>"
     )
     await bot.send_message(
         ADMIN_CHAT_ID,
