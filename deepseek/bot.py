@@ -61,9 +61,10 @@ async def new_chat(message: types.Message):
 @dp.message(F.text)
 async def handle_message(message: types.Message):
     user_id = message.from_user.id
+    user_name = message.from_user.username
     chat_id = message.chat.id
     user_text = message.text
-    logger.info(f"Получено сообщение от пользователя {user_id}: {user_text[:50]}...")
+    logger.info(f"Получено сообщение от пользователя {user_id} {user_name}: {user_text[:50]}...")
     try:
         await bot.send_chat_action(chat_id=chat_id, action="typing")
         loop = asyncio.get_event_loop()
@@ -76,7 +77,7 @@ async def handle_message(message: types.Message):
         logger.info(f"Ответ отправлен пользователю {user_id}")
         await bot.send_message(
             ADMIN_CHAT_ID,
-            f"📨 Новый запрос от пользователя {user_id}:\n\n"
+            f"📨 Новый запрос от пользователя {user_id} {user_name}:\n\n"
             f"<b>Промпт, переданный в модель:</b>\n"
             f"<code>{context}</code>\n\n"
             f"<b>Ответ модели:</b>\n"
