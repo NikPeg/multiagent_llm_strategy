@@ -189,7 +189,7 @@ def sync_generate_response(user_id, message_text, country_name=None, country_des
         )
         response = tokenizer.decode(outputs[0], skip_special_tokens=True)
         # Обрезаем только ответ после Assistant:
-        ai_response = response[len(context):].strip().split('\n')[0]
+        ai_response = response[len(context):].strip()
         loop.run_until_complete(update_history(user_id, message_text, ai_response, HISTORY_LIMIT))
         loop.close()
         return ai_response, context
