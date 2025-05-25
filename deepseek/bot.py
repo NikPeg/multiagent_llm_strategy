@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
+ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID"))
 HISTORY_LIMIT = int(os.getenv("HISTORY_LIMIT", 10))
 
 if not BOT_TOKEN:
@@ -49,7 +50,7 @@ executor = ThreadPoolExecutor(max_workers=1)
 @dp.message(Command("start"))
 async def start(message: types.Message):
     await message.answer(
-            "Я виртуальный помощник на основе DeepSeek-R1. "
+        "Я виртуальный помощник на основе DeepSeek-R1. "
         "Чтобы сбросить контекст диалога - /new")
 
 @dp.message(Command("new"))
@@ -62,18 +63,26 @@ async def handle_message(message: types.Message):
     user_id = message.from_user.id
     chat_id = message.chat.id
     user_text = message.text
-    
     logger.info(f"Получено сообщение от пользователя {user_id}: {user_text[:50]}...")
     try:
         await bot.send_chat_action(chat_id=chat_id, action="typing")
         loop = asyncio.get_event_loop()
         typing_task = asyncio.create_task(keep_typing(chat_id))
         logger.info(f"Ожидание генерации ответа для пользователя {user_id}...")
-        assistant_reply = await loop.run_in_executor(executor, sync_generate_response, user_id, user_text)
+        assistant_reply, context = await loop.run_in_executor(executor, sync_generate_response, user_id, user_text)
         logger.info(f"Ответ сгенерирован для пользователя {user_id}")
         typing_task.cancel()
         await message.answer(assistant_reply)
         logger.info(f"Ответ отправлен пользователю {user_id}")
+        await bot.send_message(
+            ADMIN_CHAT_ID,
+            f"📨 Новый запрос от пользователя {user_id}:\n\n"
+            f"<b>Промпт, переданный в модель:</b>\n"
+            f"<code>{context}</code>\n\n"
+            f"<b>Ответ модели:</b>\n"
+            f"<code>{assistant_reply}</code>",
+            parse_mode="HTML"
+        )
     except Exception as e:
         logger.error(f"Ошибка при обработке сообщения: {str(e)}", exc_info=True)
         await message.answer(f"Ошибка: {str(e)}")
@@ -111,7 +120,7 @@ def sync_generate_response(user_id, message_text):
         assistant_reply = response[len(context):].strip().split('\n')[0]
         loop.run_until_complete(update_history(user_id, message_text, assistant_reply, HISTORY_LIMIT))
         loop.close()
-        return assistant_reply
+        return assistant_reply, context
     except Exception as e:
         logger.error(f"Ошибка в generate_response: {str(e)}", exc_info=True)
         raise
@@ -130,4 +139,3 @@ if __name__ == "__main__":
         logger.info("Приложение завершено")
     except Exception as e:
         logger.critical(f"Критическая ошибка: {str(e)}", exc_info=True)
-
