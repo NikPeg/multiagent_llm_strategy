@@ -129,8 +129,24 @@ async def handle_country_desc(message: types.Message, user_id: int, user_text: s
     # 3. Парсим ответ модели (ожидается строковый JSON)
     import json
     try:
-        match = re.search(r'\{[\s\S]+\}', params_json)  # На случай, если LLM напишет что-то ещё
-        d = json.loads(match.group(0)) if match else {}
+        # Убираем все спецтеги, что может вернуть модель
+        cleaned = params_json.replace("</think>", "").replace("&lt;/think&gt;", "")
+        # Ищем все JSON-блоки
+        matches = re.findall(r'\{[\s\S]+?\}', cleaned)
+        d = None
+        for candidate in matches:
+            try:
+                v = json.loads(candidate)
+                # Проверяем, что gold и population числовые — чтобы не получить блок с "..."
+                if all(isinstance(v.get(field), (int, float)) for field in ['gold', 'population', 'army', 'food', 'territory']):
+                    d = v
+                    break
+            except Exception:
+                continue
+        if d is None:
+            logger.error(f"Не удалось разобрать параметры страны из LLM: {params_json}")
+            d = dict(gold=0, population=0, army=0, food=0, territory=0,
+                     religion="", economy="", diplomacy="", resources="")
     except Exception as e:
         logger.error(f"Ошибка разбора параметров страны из LLM: {params_json} [{str(e)}]", exc_info=True)
         # По умолчанию, если модель дала плохой ответ
