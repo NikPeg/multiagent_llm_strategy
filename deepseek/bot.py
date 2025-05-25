@@ -11,6 +11,7 @@ from transformers import AutoModelForCausalLM, AutoTokenizer
 from database import init_db, get_history, update_history, clear_history
 import torch
 from concurrent.futures import ThreadPoolExecutor
+import datetime
 
 # Настройка логирования
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
@@ -59,12 +60,10 @@ dp = Dispatcher(storage=storage)
 
 executor = ThreadPoolExecutor(max_workers=1)
 
-# Определение состояний для FSM
+# Определение состояний для FSM (упрощенная версия)
 class CountryRegistration(StatesGroup):
     waiting_for_name = State()
-    waiting_for_government = State()
-    waiting_for_resources = State()
-    waiting_for_goals = State()
+    waiting_for_description = State()
 
 # Системный промпт для модели
 SYSTEM_PROMPT = """
@@ -125,7 +124,7 @@ async def start(message: types.Message, state: FSMContext):
     reply_text = (
         "🌍 Добро пожаловать в геополитическую РПГ! 🌍\n\n"
         "Здесь вы можете создать и управлять своей страной, взаимодействовать с миром и другими игроками.\n\n"
-        "Давайте начнем с создания вашей страны. Как называется ваша страна?"
+        "Для начала, как называется ваша страна?"
     )
 
     await message.answer(reply_text)
@@ -148,7 +147,8 @@ async def process_country_name(message: types.Message, state: FSMContext):
 
     reply_text = (
         f"Отлично! Ваша страна называется {message.text}.\n\n"
-        "Какая форма правления в вашей стране? (например: демократия, монархия, диктатура и т.д.)"
+        "Теперь, пожалуйста, опишите свою страну: форма правления, ресурсы, экономика, культура, "
+        "геополитические цели, отношения с соседями и любые другие важные детали."
     )
 
     await message.answer(reply_text)
@@ -161,76 +161,23 @@ async def process_country_name(message: types.Message, state: FSMContext):
             user_info
         )
 
-    await state.set_state(CountryRegistration.waiting_for_government)
+    await state.set_state(CountryRegistration.waiting_for_description)
 
-@dp.message(CountryRegistration.waiting_for_government)
-async def process_government(message: types.Message, state: FSMContext):
+@dp.message(CountryRegistration.waiting_for_description)
+async def process_country_description(message: types.Message, state: FSMContext):
     user_info = f"{message.from_user.full_name} (@{message.from_user.username}, ID: {message.from_user.id})"
 
-    await state.update_data(government=message.text)
-    data = await state.get_data()
-
-    reply_text = (
-        f"Ваша страна - {message.text}.\n\n"
-        "Какими основными ресурсами и индустриями обладает ваша страна?"
-    )
-
-    await message.answer(reply_text)
-
-    # Пересылаем администраторам
-    if ADMIN_CHAT_ID:
-        await forward_to_admins(
-            f"Форма правления: {message.text}\nСтрана: {data.get('country_name')}",
-            reply_text,
-            user_info
-        )
-
-    await state.set_state(CountryRegistration.waiting_for_resources)
-
-@dp.message(CountryRegistration.waiting_for_resources)
-async def process_resources(message: types.Message, state: FSMContext):
-    user_info = f"{message.from_user.full_name} (@{message.from_user.username}, ID: {message.from_user.id})"
-
-    await state.update_data(resources=message.text)
-
-    reply_text = (
-        "Какие главные геополитические цели преследует ваша страна? Какие отношения с соседями?"
-    )
-
-    await message.answer(reply_text)
-
-    # Пересылаем администраторам
-    if ADMIN_CHAT_ID:
-        data = await state.get_data()
-        await forward_to_admins(
-            f"Ресурсы и индустрии: {message.text}\n"
-            f"Страна: {data.get('country_name')}\n"
-            f"Правление: {data.get('government')}",
-            reply_text,
-            user_info
-        )
-
-    await state.set_state(CountryRegistration.waiting_for_goals)
-
-@dp.message(CountryRegistration.waiting_for_goals)
-async def process_goals(message: types.Message, state: FSMContext):
-    user_info = f"{message.from_user.full_name} (@{message.from_user.username}, ID: {message.from_user.id})"
-
-    await state.update_data(goals=message.text)
+    await state.update_data(description=message.text)
 
     # Получаем все данные
     data = await state.get_data()
     country_name = data.get("country_name")
-    government = data.get("government")
-    resources = data.get("resources")
-    goals = data.get("goals")
+    description = data.get("description")
 
     # Формируем описание страны
     country_description = (
         f"Страна игрока: {country_name}\n"
-        f"Форма правления: {government}\n"
-        f"Ресурсы и индустрии: {resources}\n"
-        f"Геополитические цели: {goals}"
+        f"Описание страны: {description}"
     )
 
     # Добавляем начальную информацию в историю диалога
@@ -253,7 +200,7 @@ async def process_goals(message: types.Message, state: FSMContext):
     # Пересылаем администраторам полную информацию о стране
     if ADMIN_CHAT_ID:
         await forward_to_admins(
-            f"Геополитические цели: {message.text}\n\n"
+            f"Описание страны: {message.text}\n\n"
             f"СТРАНА ПОЛНОСТЬЮ ЗАРЕГИСТРИРОВАНА:\n{country_description}",
             reply_text,
             user_info
@@ -411,8 +358,6 @@ async def main():
     await dp.start_polling(bot)
 
 if __name__ == "__main__":
-    import datetime
-
     try:
         logger.info("Запуск приложения...")
         asyncio.run(main())
