@@ -5,12 +5,7 @@ import os
 from aiogram import Bot, Dispatcher, types, F
 from aiogram.filters import Command
 from transformers import AutoModelForCausalLM, AutoTokenizer
-from database import (
-    init_db, get_history, update_history, clear_history,
-    get_user_state, set_user_state, clear_user_state,
-    get_user_country, set_user_country,
-    get_user_country_desc, set_user_country_desc
-)
+from database import *
 import torch
 from concurrent.futures import ThreadPoolExecutor
 from parsing import *
