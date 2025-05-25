@@ -14,7 +14,7 @@ from database import (
 import torch
 from concurrent.futures import ThreadPoolExecutor
 import re
-from parsing import clean_ai_response
+from parsing import *
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
@@ -89,57 +89,59 @@ async def new_chat(message: types.Message):
 @dp.message(F.text)
 async def handle_message(message: types.Message):
     user_id = message.from_user.id
-    chat_id = message.chat.id
     user_text = message.text
-    user_name = message.from_user.username
-
-    # Получаем текущее состояние из БД
     state = await get_user_state(user_id)
 
     if state == 'waiting_for_country_name':
-        await set_user_country(user_id, user_text.strip())
-        await set_user_state(user_id, 'waiting_for_country_desc')
-        await message.answer(
-            f"Название страны: <b>{user_text.strip()}</b>\n\n"
-            f"Теперь опиши кратко свою страну (география, особенности, народ, культура, стартовые условия):",
-            parse_mode="HTML"
-        )
-        return
-
+        await handle_country_name(message, user_id, user_text)
     elif state == 'waiting_for_country_desc':
-        await set_user_country_desc(user_id, user_text.strip())
-        await set_user_state(user_id, None)  # Сбросить состояние
-        country = await get_user_country(user_id)
-        await message.answer(
-            f"Описание страны сохранено. Игра начата!\n"
-            f"Действуй как правитель страны <b>{country}</b>.\n"
-            f"Ты можешь отдавать приказы, объявлять войны, строить города или устанавливать отношения с другими странами.\n"
-            f"В любой момент используй /new чтобы сбросить контекст."
-            "\n\nЧто будешь делать первым делом?"
-            , parse_mode="HTML"
-        )
-        return
+        await handle_country_desc(message, user_id, user_text)
+    else:
+        await handle_game_dialog(message, user_id, user_text)
 
-    # Если не идёт этап знакомства — обычный игровой диалог
+async def handle_country_name(message: types.Message, user_id: int, user_text: str):
+    await set_user_country(user_id, user_text.strip())
+    await set_user_state(user_id, 'waiting_for_country_desc')
+    await message.answer(
+        f"Название страны: <b>{user_text.strip()}</b>\n\n"
+        f"Теперь опиши кратко свою страну (география, особенности, народ, культура, стартовые условия):",
+        parse_mode="HTML"
+    )
+
+async def handle_country_desc(message: types.Message, user_id: int, user_text: str):
+    await set_user_country_desc(user_id, user_text.strip())
+    await set_user_state(user_id, None)  # Сбросить состояние
+    country = await get_user_country(user_id)
+    await message.answer(
+        f"Описание страны сохранено. Игра начата!\n"
+        f"Действуй как правитель страны <b>{country}</b>.\n"
+        f"Ты можешь отдавать приказы, объявлять войны, строить города или устанавливать отношения с другими странами.\n"
+        f"В любой момент используй /new чтобы сбросить контекст."
+        "\n\nЧто будешь делать первым делом?",
+        parse_mode="HTML"
+    )
+
+async def handle_game_dialog(message: types.Message, user_id: int, user_text: str):
+    chat_id = message.chat.id
+    user_name = message.from_user.username
     logger.info(f"Получено сообщение от пользователя {user_id} {user_name}: {user_text[:50]}...")
     try:
         await bot.send_chat_action(chat_id=chat_id, action="typing")
         loop = asyncio.get_event_loop()
         typing_task = asyncio.create_task(keep_typing(chat_id))
         logger.info(f"Ожидание генерации ответа для пользователя {user_id}...")
-        # Получаем страну и описание из БД
         country_name = await get_user_country(user_id)
         country_desc = await get_user_country_desc(user_id)
-        # Передаём их страну и описание для расширения промпта
         assistant_reply, context = await loop.run_in_executor(
             executor, sync_generate_response, user_id, user_text, country_name, country_desc
         )
         logger.info(f"Ответ сгенерирован для пользователя {user_id}")
         typing_task.cancel()
+        html_reply = stars_to_bold(assistant_reply)
         try:
-            await message.answer(assistant_reply, parse_mode="MarkdownV2")
-        except Exception:
-            # Если не удалось из-за некорректных звёздочек или разметки — отправить как простой текст
+            await message.answer(html_reply, parse_mode="HTML")
+        except Exception as e:
+            logger.error(f"Ошибка при отправке сообщения с HTML: {str(e)}", exc_info=True)
             await message.answer(assistant_reply)
         logger.info(f"Ответ отправлен пользователю {user_id}")
         await bot.send_message(

@@ -27,3 +27,7 @@ def clean_ai_response(text: str) -> str:
         text = text[:cut_pos].rstrip()
 
     return text.strip()
+
+def stars_to_bold(text):
+    # Заменяем все **text** на <b>text</b>
+    return re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', text)
