@@ -113,6 +113,51 @@ async def handle_country_desc(message: types.Message, user_id: int, user_text: s
     await set_user_country_desc(user_id, user_text.strip())
     await set_user_state(user_id, None)  # Сбросить состояние
     country = await get_user_country(user_id)
+
+    # 1. Формируем prompt для извлечения параметров из LLM (RAG)
+    extract_prompt = (
+        f"Описание государства: {user_text.strip()}\n"
+        f"На основе этого описания оцени параметры новой страны в древнем мире. "
+        f"В числовых параметрах (gold, population, army, food, territory) пиши только числа. "
+        f"В параметрах-religion, economy, diplomacy, resources — короткая фраза.\n"
+        f"Ответ строго в формате JSON без комментариев и лишнего текста!\n"
+        "{\n"
+        "  \"gold\": ..., \"population\": ..., \"army\": ..., \"food\": ..., \"territory\": ..., "
+        "\"religion\": \"...\", \"economy\": \"...\", \"diplomacy\": \"...\", \"resources\": \"...\"\n"
+        "}\n"
+    )
+
+    # 2. Спрашиваем у локальной LLM
+    loop = asyncio.get_event_loop()
+    params_json = await loop.run_in_executor(None, generate_country_params, extract_prompt)
+
+    # 3. Парсим ответ модели (ожидается строковый JSON)
+    import json
+    try:
+        match = re.search(r'\{[\s\S]+\}', params_json)  # На случай, если LLM напишет что-то ещё
+        d = json.loads(match.group(0)) if match else {}
+    except Exception as e:
+        logger.error(f"Ошибка разбора параметров страны из LLM: {params_json} [{str(e)}]", exc_info=True)
+        # По умолчанию, если модель дала плохой ответ
+        d = dict(gold=0, population=0, army=0, food=0, territory=0,
+                 religion="", economy="", diplomacy="", resources="")
+
+    # 4. Создаём страну в БД!
+    await create_country(
+        user_id=user_id,
+        name=country,
+        gold=d.get('gold', 0),
+        population=d.get('population', 0),
+        army=d.get('army', 0),
+        food=d.get('food', 0),
+        territory=d.get('territory', 0),
+        religion=d.get('religion', ""),
+        economy=d.get('economy', ""),
+        diplomacy=d.get('diplomacy', ""),
+        resources=d.get('resources', ""),
+        summary=user_text.strip(),
+    )
+
     await message.answer(
         f"Описание страны сохранено. Игра начата!\n"
         f"Действуй как правитель страны <b>{country}</b>.\n"
@@ -121,6 +166,23 @@ async def handle_country_desc(message: types.Message, user_id: int, user_text: s
         "\n\nЧто будешь делать первым делом?",
         parse_mode="HTML"
     )
+
+def generate_country_params(prompt):
+    """
+    Вспомогательная функция для sync вызова генерации параметров страны моделью.
+    """
+    inputs = tokenizer(prompt, return_tensors="pt").to(model.device)
+    outputs = model.generate(
+        **inputs,
+        max_new_tokens=256,
+        do_sample=True,
+        temperature=0.7,
+        top_p=0.95,
+        eos_token_id=tokenizer.eos_token_id,
+        pad_token_id=tokenizer.eos_token_id
+    )
+    response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+    return response
 
 async def handle_game_dialog(message: types.Message, user_id: int, user_text: str):
     chat_id = message.chat.id
