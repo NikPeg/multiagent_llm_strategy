@@ -109,6 +109,9 @@ async def handle_country_desc(message: types.Message, user_id: int, user_text: s
     await set_user_state(user_id, None)  # Сбросить состояние
     country = await get_user_country(user_id)
 
+    # Включаем "типинг"
+    typing_task = asyncio.create_task(keep_typing(message.chat.id))
+
     # 1. Формируем prompt для извлечения параметров из LLM (RAG)
     extract_prompt = (
         f"Описание государства: {user_text.strip()}\n"
@@ -128,16 +131,17 @@ async def handle_country_desc(message: types.Message, user_id: int, user_text: s
 
     # 3. Парсим ответ модели (ожидается строковый JSON)
     import json
+    import re
     try:
         # Убираем все спецтеги, что может вернуть модель
-        cleaned = params_json.replace("</think>", "").replace("&lt;/think&gt;", "")
+        cleaned = params_json.replace("&lt;/think&gt;", "").replace("</think>", "")
         # Ищем все JSON-блоки
         matches = re.findall(r'\{[\s\S]+?\}', cleaned)
         d = None
         for candidate in matches:
             try:
                 v = json.loads(candidate)
-                # Проверяем, что gold и population числовые — чтобы не получить блок с "..."
+                # Проверяем, что gold и population и другие числовые — действительно числа
                 if all(isinstance(v.get(field), (int, float)) for field in ['gold', 'population', 'army', 'food', 'territory']):
                     d = v
                     break
@@ -149,7 +153,6 @@ async def handle_country_desc(message: types.Message, user_id: int, user_text: s
                      religion="", economy="", diplomacy="", resources="")
     except Exception as e:
         logger.error(f"Ошибка разбора параметров страны из LLM: {params_json} [{str(e)}]", exc_info=True)
-        # По умолчанию, если модель дала плохой ответ
         d = dict(gold=0, population=0, army=0, food=0, territory=0,
                  religion="", economy="", diplomacy="", resources="")
 
@@ -169,6 +172,22 @@ async def handle_country_desc(message: types.Message, user_id: int, user_text: s
         summary=user_text.strip(),
     )
 
+    # Останавливаем typing
+    typing_task.cancel()
+
+    # Пересылаем описание и параметры админу
+    admin_msg = (
+        f"🛡 Новый игрок создал страну <b>{country}</b>!\n"
+        f"<b>Описание:</b> <pre>{user_text.strip()}</pre>\n"
+        f"<b>Параметры от модели:</b> <pre>{d}</pre>\n"
+        f"<b>Ответ модели (сырое):</b> <pre>{params_json}</pre>"
+    )
+    await bot.send_message(
+        ADMIN_CHAT_ID,
+        admin_msg,
+        parse_mode='HTML'
+    )
+
     await message.answer(
         f"Описание страны сохранено. Игра начата!\n"
         f"Действуй как правитель страны <b>{country}</b>.\n"
@@ -177,6 +196,7 @@ async def handle_country_desc(message: types.Message, user_id: int, user_text: s
         "\n\nЧто будешь делать первым делом?",
         parse_mode="HTML"
     )
+
 
 def generate_country_params(prompt):
     """
