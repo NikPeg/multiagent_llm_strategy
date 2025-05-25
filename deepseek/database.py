@@ -22,7 +22,7 @@ async def get_history(user_id: int) -> List[str]:
 
 async def update_history(user_id: int, message: str, response: str, history_limit: int):
     history = await get_history(user_id)
-    history.extend([f"User: {message}", f"Assistant: {response}"])
+    history.extend([f"Player: {message}", f"Game referee: {response}"])
     history = history[-history_limit:]
 
     async with aiosqlite.connect("chats.db") as db:

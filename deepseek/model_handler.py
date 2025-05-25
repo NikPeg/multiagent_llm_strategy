@@ -36,25 +36,7 @@ def init_model():
     return model, tokenizer
 
 def format_conversation_history(history: List[str]) -> str:
-    """
-    Форматирует историю диалога в правильный формат для модели.
-
-    История приходит в формате ['сообщение пользователя', 'ответ бота', 'сообщение пользователя', 'ответ бота', ...]
-    Нам нужно преобразовать это в:
-    'Игрок: сообщение пользователя
-    Судья игры: ответ бота
-    Игрок: сообщение пользователя
-    Судья игры: ответ бота'
-    """
-    formatted_history = []
-
-    for i, message in enumerate(history):
-        if i % 2 == 0:  # Четные индексы - сообщения пользователя
-            formatted_history.append(f"Игрок: {message}")
-        else:  # Нечетные индексы - ответы бота
-            formatted_history.append(f"Судья игры: {message}")
-
-    return '\n'.join(formatted_history)
+    return '\n'.join(history)
 
 def sync_generate_response(user_id, message_text, system_prompt, model, tokenizer, history_limit):
     """Генерирует ответ модели на сообщение пользователя с учетом истории диалога"""
@@ -76,10 +58,10 @@ def sync_generate_response(user_id, message_text, system_prompt, model, tokenize
 
         # Формируем промпт с историей и системным промптом
         if formatted_history:
-            context = f"{system_prompt}\n\n{formatted_history}\nИгрок: {message_text}\nСудья игры:"
+            context = f"{system_prompt}\n\n{formatted_history}\nPlayer: {message_text}\nGame referee:"
         else:
             # Если истории нет, используем только текущее сообщение
-            context = f"{system_prompt}\n\nИгрок: {message_text}\nСудья игры:"
+            context = f"{system_prompt}\n\nPlayer: {message_text}\nGame referee:"
 
         logger.debug(f"Контекст для модели: {context[:200]}...")
 
@@ -90,7 +72,7 @@ def sync_generate_response(user_id, message_text, system_prompt, model, tokenize
             # Генерируем ответ
             outputs = model.generate(
                 **inputs,
-                max_new_tokens=512,
+                max_new_tokens=150,
                 do_sample=True,
                 temperature=0.7,
                 top_p=0.95,
@@ -113,7 +95,7 @@ def sync_generate_response(user_id, message_text, system_prompt, model, tokenize
                 clean_lines = []
                 for line in assistant_reply.split('\n'):
                     # Удаляем строки, которые могут быть началом нового сообщения пользователя
-                    if not line.strip().startswith('Игрок:') and not line.strip().startswith('User:'):
+                    if not line.strip().startswith('Player:') and not line.strip().startswith('User:'):
                         clean_lines.append(line)
                 assistant_reply = '\n'.join(clean_lines)
 
