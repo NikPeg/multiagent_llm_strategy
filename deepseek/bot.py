@@ -84,7 +84,7 @@ async def new_chat(message: types.Message):
     await clear_user_state(user_id)
     await set_user_country(user_id, None)
     await set_user_country_desc(user_id, None)
-    await message.answer("⚔️ Контекст диалога сброшен!⚔️")
+    await message.answer("⚔️Контекст диалога сброшен!⚔️")
 
 @dp.message(F.text)
 async def handle_message(message: types.Message):
@@ -136,7 +136,11 @@ async def handle_message(message: types.Message):
         )
         logger.info(f"Ответ сгенерирован для пользователя {user_id}")
         typing_task.cancel()
-        await message.answer(assistant_reply)
+        try:
+            await message.answer(assistant_reply, parse_mode="MarkdownV2")
+        except Exception:
+            # Если не удалось из-за некорректных звёздочек или разметки — отправить как простой текст
+            await message.answer(assistant_reply)
         logger.info(f"Ответ отправлен пользователю {user_id}")
         await bot.send_message(
             ADMIN_CHAT_ID,
