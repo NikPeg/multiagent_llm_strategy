@@ -23,7 +23,7 @@ load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID"))
 HISTORY_LIMIT = int(os.getenv("HISTORY_LIMIT", 4))
-MAX_NEW_TOKENS = int(os.getenv("MAX_NEW_TOKENS"), 512)
+MAX_NEW_TOKENS = int(os.getenv("MAX_NEW_TOKENS", 512))
 
 if not BOT_TOKEN:
     raise ValueError("Токен бота не найден в .env!")
