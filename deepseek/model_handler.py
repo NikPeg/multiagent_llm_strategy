@@ -1,5 +1,6 @@
 import logging
 import torch
+from typing import List
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from database import get_history, update_history
 
@@ -34,20 +35,59 @@ def init_model():
 
     return model, tokenizer
 
+def format_conversation_history(history: List[str]) -> str:
+    """
+    Форматирует историю диалога в правильный формат для модели.
+
+    История приходит в формате ['сообщение пользователя', 'ответ бота', 'сообщение пользователя', 'ответ бота', ...]
+    Нам нужно преобразовать это в:
+    'Игрок: сообщение пользователя
+    Судья игры: ответ бота
+    Игрок: сообщение пользователя
+    Судья игры: ответ бота'
+    """
+    formatted_history = []
+
+    for i, message in enumerate(history):
+        if i % 2 == 0:  # Четные индексы - сообщения пользователя
+            formatted_history.append(f"Игрок: {message}")
+        else:  # Нечетные индексы - ответы бота
+            formatted_history.append(f"Судья игры: {message}")
+
+    return '\n'.join(formatted_history)
+
 def sync_generate_response(user_id, message_text, system_prompt, model, tokenizer, history_limit):
-    """Генерирует ответ модели на сообщение пользователя"""
+    """Генерирует ответ модели на сообщение пользователя с учетом истории диалога"""
     import asyncio
     try:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
+
+        # Получаем историю диалога
         history = loop.run_until_complete(get_history(user_id))
 
-        # Добавляем системный промпт к контексту
-        context = system_prompt + "\n\n" + '\n'.join(history + [f"Игрок: {message_text}"]) + "\nСудья игры:"
+        logger.info(f"Получена история диалога для пользователя {user_id}, {len(history)} сообщений")
 
+        # Форматируем историю для использования в промпте
+        formatted_history = ""
+        if history:
+            formatted_history = format_conversation_history(history)
+            logger.debug(f"Форматированная история: {formatted_history[:200]}...")
+
+        # Формируем промпт с историей и системным промптом
+        if formatted_history:
+            context = f"{system_prompt}\n\n{formatted_history}\nИгрок: {message_text}\nСудья игры:"
+        else:
+            # Если истории нет, используем только текущее сообщение
+            context = f"{system_prompt}\n\nИгрок: {message_text}\nСудья игры:"
+
+        logger.debug(f"Контекст для модели: {context[:200]}...")
+
+        # Токенизируем контекст
         inputs = tokenizer(context, return_tensors="pt").to(model.device)
 
         try:
+            # Генерируем ответ
             outputs = model.generate(
                 **inputs,
                 max_new_tokens=512,
@@ -58,7 +98,10 @@ def sync_generate_response(user_id, message_text, system_prompt, model, tokenize
                 pad_token_id=tokenizer.eos_token_id
             )
 
+            # Декодируем ответ
             response = tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+            # Извлекаем только часть ответа, которая следует за промптом
             assistant_reply = response[len(context):].strip()
 
             # Проверяем, что ответ не пустой
@@ -69,6 +112,7 @@ def sync_generate_response(user_id, message_text, system_prompt, model, tokenize
             if '\n' in assistant_reply:
                 clean_lines = []
                 for line in assistant_reply.split('\n'):
+                    # Удаляем строки, которые могут быть началом нового сообщения пользователя
                     if not line.strip().startswith('Игрок:') and not line.strip().startswith('User:'):
                         clean_lines.append(line)
                 assistant_reply = '\n'.join(clean_lines)
@@ -77,10 +121,13 @@ def sync_generate_response(user_id, message_text, system_prompt, model, tokenize
             if not assistant_reply or assistant_reply.strip() == "":
                 assistant_reply = "Извините, произошла техническая ошибка. Продолжайте вашу игру, опишите следующие действия вашей страны."
 
+            logger.info(f"Сгенерирован ответ длиной {len(assistant_reply)} символов")
+
         except Exception as gen_error:
             logger.error(f"Ошибка при генерации ответа: {str(gen_error)}", exc_info=True)
             assistant_reply = "Произошла техническая ошибка в работе модели. Пожалуйста, попробуйте еще раз."
 
+        # Обновляем историю диалога
         loop.run_until_complete(update_history(user_id, message_text, assistant_reply, history_limit))
         loop.close()
         return assistant_reply
