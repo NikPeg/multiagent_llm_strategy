@@ -107,6 +107,7 @@ async def handle_country_desc(message: types.Message, user_id: int, user_text: s
         model_handler.sync_generate_response,
         user_id, initial_status_prompt, RPG_PROMPT, country, user_text.strip(), HISTORY_LIMIT
     )
+    logger.info(f"Состояние страны {country}: {country_status}")
 
     # Сохраняем сгенерированное состояние страны
     await set_country_status(user_id, country_status)
