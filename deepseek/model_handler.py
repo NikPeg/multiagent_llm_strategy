@@ -2,6 +2,7 @@ import logging
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from database import get_history, update_history
+from parsing import *
 
 logger = logging.getLogger(__name__)
 
@@ -34,21 +35,6 @@ class ModelHandler:
             logger.info(f"Текущее использование GPU памяти: {torch.cuda.memory_allocated() / 1024**2:.2f} МБ")
             logger.info(f"Максимальная доступная GPU память: {torch.cuda.get_device_properties(0).total_memory / 1024**2:.2f} МБ")
 
-    def clean_ai_response(self, response):
-        """Clean up AI response text"""
-        if "Ассистент:" in response:
-            response = response.split("Ассистент:", 1)[1].strip()
-
-        # Clean other potential artifacts
-        lines = response.split('\n')
-        cleaned_lines = []
-        for line in lines:
-            if "Игрок:" in line:
-                break
-            cleaned_lines.append(line)
-
-        return '\n'.join(cleaned_lines)
-
     def sync_generate_response(self, user_id, message_text, rpg_prompt, country_name=None, country_desc=None, history_limit=4):
         import asyncio
         try:
@@ -76,7 +62,7 @@ class ModelHandler:
             response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
 
             # Чистим ответ ассистента
-            ai_response = self.clean_ai_response(response[len(context):].strip())
+            ai_response = clean_ai_response(response[len(context):].strip())
 
             loop.run_until_complete(update_history(user_id, message_text, ai_response, history_limit))
             loop.close()
