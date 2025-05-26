@@ -118,6 +118,16 @@ async def handle_country_desc(message: types.Message, user_id: int, user_text: s
         f"<b>Начальное состояние вашей страны:</b>\n\n{stars_to_bold(country_status)}",
         parse_mode="HTML"
     )
+    user_name = message.from_user.username
+    await bot.send_message(
+        ADMIN_CHAT_ID,
+        f"📨 Регистрация новой страны от пользователя {user_id} {user_name}:\n\n"
+        f"Название страны: <b>{country}</b>\n"
+        f"Описание страны:\n{user_text}\n\n"
+        f"<b>Состояние страны:</b>\n"
+        f"{country_status}",
+        parse_mode="HTML"
+    )
 
     # Завершаем установку и переходим к игре
     await set_user_state(user_id, None)  # Сбросить состояние
