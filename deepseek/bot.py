@@ -106,7 +106,7 @@ async def handle_country_desc(message: types.Message, user_id: int, user_text: s
     country_status, _ = await loop.run_in_executor(
         executor,
         model_handler.sync_generate_response,
-        user_id, initial_status_prompt, RPG_PROMPT, country, user_text.strip(), HISTORY_LIMIT
+        user_id, "", initial_status_prompt, country, user_text.strip(), HISTORY_LIMIT
     )
     logger.info(f"Состояние страны {country}: {country_status}")
 
