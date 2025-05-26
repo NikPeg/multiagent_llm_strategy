@@ -85,11 +85,41 @@ async def handle_country_name(message: types.Message, user_id: int, user_text: s
 
 async def handle_country_desc(message: types.Message, user_id: int, user_text: str):
     await set_user_country_desc(user_id, user_text.strip())
-    await set_user_state(user_id, None)  # Сбросить состояние
     country = await get_user_country(user_id)
+
+    # Генерируем начальное состояние страны после получения описания
+    await message.answer("Создаю детальное описание состояния вашей страны...")
+    await bot.send_chat_action(chat_id=message.chat.id, action="typing")
+
+    initial_status_prompt = (
+        f"Создай подробное описание начального состояния страны '{country}' "
+        f"с учетом её описания: {user_text.strip()}. "
+        f"Опиши следующие параметры: казна (количество золота), ежемесячные доходы и расходы, "
+        f"население (общее количество и распределение по сословиям), основные ресурсы, "
+        f"размер армии, контролируемые территории, уровень технологий, "
+        f"состояние культуры и религии. Представь информацию в структурированном виде."
+    )
+
+    loop = asyncio.get_event_loop()
+    country_status, _ = await loop.run_in_executor(
+        executor,
+        model_handler.sync_generate_response,
+        user_id, initial_status_prompt, RPG_PROMPT, country, user_text.strip(), HISTORY_LIMIT
+    )
+
+    # Сохраняем сгенерированное состояние страны
+    await set_country_status(user_id, country_status)
+
+    # Показываем пользователю начальное состояние страны
     await message.answer(
-        f"Описание страны сохранено. Игра начата!\n"
-        f"Действуй как правитель страны <b>{country}</b>.\n"
+        f"<b>Начальное состояние вашей страны:</b>\n\n{stars_to_bold(country_status)}",
+        parse_mode="HTML"
+    )
+
+    # Завершаем установку и переходим к игре
+    await set_user_state(user_id, None)  # Сбросить состояние
+    await message.answer(
+        f"Игра начата! Действуй как правитель страны <b>{country}</b>.\n"
         f"Ты можешь отдавать приказы, объявлять войны, строить города или устанавливать отношения с другими странами.\n"
         f"В любой момент используй /new чтобы сбросить контекст."
         "\n\nЧто будешь делать первым делом?",
@@ -133,6 +163,57 @@ async def handle_game_dialog(message: types.Message, user_id: int, user_text: st
     except Exception as e:
         logger.error(f"Ошибка при обработке сообщения: {str(e)}", exc_info=True)
         await message.answer(f"Ошибка: {str(e)}")
+
+@dp.message(Command("admin_status"))
+async def admin_status(message: types.Message):
+    # Проверка, что запрос от администратора
+    if message.from_user.id != ADMIN_CHAT_ID:
+        await message.answer("У вас нет прав на эту команду.")
+        return
+
+    # Получаем информацию о всех странах
+    async with aiosqlite.connect("chats.db") as db:
+        async with db.execute(
+                """SELECT user_id, country, country_status 
+                   FROM user_states 
+                   WHERE country IS NOT NULL"""
+        ) as cursor:
+            countries = await cursor.fetchall()
+
+    if not countries:
+        await message.answer("Активных стран не обнаружено.")
+        return
+
+    # Отправляем статус каждой страны
+    for user_id, country_name, status in countries:
+        await message.answer(
+            f"<b>Страна:</b> {country_name}\n"
+            f"<b>ID игрока:</b> {user_id}\n\n"
+            f"<b>Текущее состояние:</b>\n{stars_to_bold(status)}",
+            parse_mode="HTML"
+        )
+
+async def update_country_status(user_id, country_name, country_desc, action):
+    """Обновляет состояние страны после действия игрока"""
+    current_status = await get_country_status(user_id)
+
+    status_update_prompt = (
+        f"Страна: {country_name}\n"
+        f"Текущее состояние страны:\n{current_status}\n\n"
+        f"Игрок выполнил действие: {action}\n\n"
+        f"Обнови параметры страны с учетом выполненного действия. "
+        f"Сохрани структуру, но измени соответствующие показатели."
+    )
+
+    loop = asyncio.get_event_loop()
+    new_status, _ = await loop.run_in_executor(
+        executor,
+        model_handler.sync_generate_response,
+        user_id, status_update_prompt, RPG_PROMPT, country_name, country_desc, HISTORY_LIMIT
+    )
+
+    await set_country_status(user_id, new_status)
+    return new_status
 
 async def keep_typing(chat_id):
     try:
