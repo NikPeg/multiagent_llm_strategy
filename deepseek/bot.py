@@ -105,8 +105,8 @@ async def handle_country_desc(message: types.Message, user_id: int, user_text: s
     loop = asyncio.get_event_loop()
     country_status, _ = await loop.run_in_executor(
         executor,
-        model_handler.sync_generate_response,
-        user_id, "", initial_status_prompt, country, user_text.strip(), HISTORY_LIMIT
+        model_handler.generate_short_responce,
+        initial_status_prompt,
     )
     logger.info(f"Состояние страны {country}: {country_status}")
 

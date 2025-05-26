@@ -70,3 +70,30 @@ class ModelHandler:
         except Exception as e:
             logger.error(f"Ошибка в generate_response: {str(e)}", exc_info=True)
             raise
+
+    def generate_short_responce(self, prompt: str) -> str:
+        import asyncio
+        try:
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+
+            inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
+            outputs = self.model.generate(
+                **inputs,
+                max_new_tokens=self.max_new_tokens,
+                do_sample=True,
+                temperature=0.7,
+                top_p=0.95,
+                eos_token_id=self.tokenizer.eos_token_id,
+                pad_token_id=self.tokenizer.eos_token_id
+            )
+            response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+
+            # Чистим ответ ассистента
+            ai_response = clean_ai_response(response[len(prompt):].strip())
+
+            loop.close()
+            return ai_response
+        except Exception as e:
+            logger.error(f"Ошибка в generate_short_response: {str(e)}", exc_info=True)
+            raise
