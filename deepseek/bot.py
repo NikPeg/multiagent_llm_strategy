@@ -93,11 +93,9 @@ async def handle_country_desc(message: types.Message, user_id: int, user_text: s
     typing_task = asyncio.create_task(keep_typing(chat_id))
 
     initial_status_prompt = (
-        f"Создай краткое описание начального состояния страны '{country}' "
-        f"с учетом её описания: {user_text.strip()}. "
-        f"Представь информацию в структурированном виде. "
-        f"Напиши ТОЛЬКО само состояние страны без вводных фраз, приветствий или заключений. "
-        f"Начни ответ сразу с фактов о стране, без фраз типа 'Вот описание' и т.п.\n"
+        f"Название страны: '{country}'\n"
+        f"Описание страны: {user_text.strip()}\n"
+        f"Начальное состояние страны в игре:"
     )
 
     loop = asyncio.get_event_loop()
