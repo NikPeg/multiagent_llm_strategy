@@ -22,6 +22,7 @@ def clean_ai_response(text: str, drop_double=True) -> str:
             cuts.append(double_newline)
 
     # Если найдено хотя бы одно ключевое слово или перенос
+    cut_pos = None
     if cuts:
         cut_pos = min(cuts)
     text = text[:cut_pos].rstrip()
