@@ -95,7 +95,7 @@ async def handle_country_desc(message: types.Message, user_id: int, user_text: s
     initial_status_prompt = (
         f"Название страны: '{country}'\n"
         f"Описание страны: {user_text.strip()}\n"
-        f"Начальное состояние страны в игре:"
+        f"Подробное состояние страны в игре (экономика, культура, армия, территории):"
     )
 
     loop = asyncio.get_event_loop()
