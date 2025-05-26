@@ -146,3 +146,14 @@ async def set_country_status(user_id: int, country_status: Optional[str]):
                 (user_id, country_status)
             )
         await db.commit()
+
+async def get_all_active_countries():
+    """Получает информацию о всех активных странах"""
+    async with aiosqlite.connect("chats.db") as db:
+        async with db.execute(
+                """SELECT user_id, country, country_status 
+                   FROM user_states 
+                   WHERE country IS NOT NULL"""
+        ) as cursor:
+            countries = await cursor.fetchall()
+            return countries

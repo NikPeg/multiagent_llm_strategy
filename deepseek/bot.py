@@ -89,7 +89,8 @@ async def handle_country_desc(message: types.Message, user_id: int, user_text: s
 
     # Генерируем начальное состояние страны после получения описания
     await message.answer("Создаю детальное описание состояния вашей страны...")
-    await bot.send_chat_action(chat_id=message.chat.id, action="typing")
+    chat_id = message.chat.id
+    typing_task = asyncio.create_task(keep_typing(chat_id))
 
     initial_status_prompt = (
         f"Создай подробное описание начального состояния страны '{country}' "
@@ -125,6 +126,7 @@ async def handle_country_desc(message: types.Message, user_id: int, user_text: s
         "\n\nЧто будешь делать первым делом?",
         parse_mode="HTML"
     )
+    typing_task.cancel()
 
 async def handle_game_dialog(message: types.Message, user_id: int, user_text: str):
     chat_id = message.chat.id
@@ -171,14 +173,8 @@ async def admin_status(message: types.Message):
         await message.answer("У вас нет прав на эту команду.")
         return
 
-    # Получаем информацию о всех странах
-    async with aiosqlite.connect("chats.db") as db:
-        async with db.execute(
-                """SELECT user_id, country, country_status 
-                   FROM user_states 
-                   WHERE country IS NOT NULL"""
-        ) as cursor:
-            countries = await cursor.fetchall()
+    # Получаем информацию о всех странах через специальную функцию
+    countries = await get_all_active_countries()
 
     if not countries:
         await message.answer("Активных стран не обнаружено.")
