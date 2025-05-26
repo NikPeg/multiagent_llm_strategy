@@ -1,6 +1,6 @@
 import re
 
-def clean_ai_response(text: str) -> str:
+def clean_ai_response(text: str, drop_double=True) -> str:
     """
     Очищает ответ от спец-тегов и по ключевым словам User: Player: Игрок: и двойному переводу строки (\n\n)
     """
@@ -15,16 +15,16 @@ def clean_ai_response(text: str) -> str:
     match = pattern.search(text)
     if match:
         cuts.append(match.start())
-
-    # Двойной перенос строки как граница ответа
-    double_newline = text.find('\n\n')
-    if double_newline != -1:
-        cuts.append(double_newline)
+    if drop_double:
+        # Двойной перенос строки как граница ответа
+        double_newline = text.find('\n\n')
+        if double_newline != -1:
+            cuts.append(double_newline)
 
     # Если найдено хотя бы одно ключевое слово или перенос
     if cuts:
         cut_pos = min(cuts)
-        text = text[:cut_pos].rstrip()
+    text = text[:cut_pos].rstrip()
 
     return text.strip()
 
