@@ -16,7 +16,8 @@ async def init_db():
                 user_id INTEGER PRIMARY KEY,
                 state TEXT,
                 country TEXT,
-                country_desc TEXT
+                country_desc TEXT,
+                country_status TEXT
             )"""
         )
         await db.commit()
@@ -121,4 +122,27 @@ async def set_user_country_desc(user_id: int, country_desc: Optional[str]):
 async def clear_user_state(user_id: int):
     async with aiosqlite.connect("chats.db") as db:
         await db.execute("DELETE FROM user_states WHERE user_id = ?", (user_id,))
+        await db.commit()
+
+# Новые функции для работы с состоянием страны
+async def get_country_status(user_id: int) -> Optional[str]:
+    async with aiosqlite.connect("chats.db") as db:
+        async with db.execute(
+                "SELECT country_status FROM user_states WHERE user_id = ?",
+                (user_id,)
+        ) as cursor:
+            result = await cursor.fetchone()
+            return result[0] if result else None
+
+async def set_country_status(user_id: int, country_status: Optional[str]):
+    async with aiosqlite.connect("chats.db") as db:
+        if country_status is None:
+            await db.execute("UPDATE user_states SET country_status = NULL WHERE user_id = ?", (user_id,))
+        else:
+            await db.execute(
+                """INSERT INTO user_states (user_id, country_status)
+                   VALUES (?, ?)
+                   ON CONFLICT(user_id) DO UPDATE SET country_status=excluded.country_status""",
+                (user_id, country_status)
+            )
         await db.commit()
