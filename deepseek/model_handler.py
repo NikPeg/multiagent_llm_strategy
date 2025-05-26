@@ -90,7 +90,7 @@ class ModelHandler:
             response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
 
             # Чистим ответ ассистента
-            ai_response = clean_ai_response(response[len(prompt):].strip(), False)
+            ai_response = clean_ai_response(response[len(prompt):].strip())
 
             loop.close()
             return ai_response
