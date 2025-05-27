@@ -177,7 +177,7 @@ async def handle_game_dialog(message: types.Message, user_id: int, user_text: st
 @dp.message(Command("admin_status"))
 async def admin_status(message: types.Message):
     # Проверка, что запрос от администратора
-    if message.from_user.id != ADMIN_CHAT_ID:
+    if message.chat.id != ADMIN_CHAT_ID:
         await message.answer("У вас нет прав на эту команду.")
         return
 
