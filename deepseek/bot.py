@@ -103,14 +103,11 @@ async def handle_message(message: types.Message):
     # Ловим этап игры: название страны, описание страны или опрос аспектов, иначе: игровой диалог
     country = await get_user_country(user_id)
     country_desc = await get_user_country_desc(user_id)
-    aspect_index = await get_aspect_index(user_id)
 
     if not country:
         await handle_country_name(message, user_id, user_text)
     elif not country_desc:
         await handle_country_desc(message, user_id, user_text)
-    elif aspect_index is not None:
-        await handle_aspect_step(message, user_id, user_text, aspect_index)
     else:
         await handle_game_dialog(message, user_id, user_text)
 
@@ -123,50 +120,75 @@ async def handle_country_name(message: types.Message, user_id: int, user_text: s
     )
 
 async def handle_country_desc(message: types.Message, user_id: int, user_text: str):
-    await set_user_country_desc(user_id, user_text)
-    # Запустить опрос аспектов, начиная с первого (0)
-    await set_aspect_index(user_id, 0)
-    await answer_html(message, ASPECTS[0][2])
+    await set_user_country_desc(user_id, user_text.strip())
+    country = await get_user_country(user_id)
+    chat_id = message.chat.id
 
-async def handle_aspect_step(message: types.Message, user_id: int, user_text: str, aspect_index: int):
-    code, label, question = ASPECTS[aspect_index]
-    await set_user_aspect(user_id, code, user_text)
+    await answer_html(message, "Создаю подробное начальное описание всех аспектов вашей страны, пожалуйста, подождите...")
+    typing_task = asyncio.create_task(keep_typing(bot, chat_id))
 
-    # Переходим к следующему аспекту, либо стартуем игру если все заполнено:
-    if aspect_index + 1 < len(ASPECTS):
-        await set_aspect_index(user_id, aspect_index + 1)
-        next_question = ASPECTS[aspect_index + 1][2]
-        await answer_html(message, next_question)
-    else:
-        await set_aspect_index(user_id, None)
-        # Все аспекты сохранены — показываем итог и переходим к игре!
-        summary_lines = []
-        for code, label, _ in ASPECTS:
-            value = await get_user_aspect(user_id, code)
-            if value:
-                summary_lines.append(f"<b>{label}:</b>\n{stars_to_bold(value)}")
-        country = await get_user_country(user_id)
-        await answer_html(
-            message,
-            f"✅ Все аспекты описаны! Начальное состояние страны <b>{country}</b>:\n\n" +
-            "\n\n".join(summary_lines)
+    aspect_prompts = [
+        ("экономика", "Опиши экономику этой страны."),
+        ("военное_дело", "Опиши военную организацию, силу армии и оборону страны."),
+        ("внеш_политика", "Опиши внешнюю политику страны, отношения с соседями."),
+        ("территория", "Опиши территорию, географию, природные особенности страны."),
+        ("технологичность", "Охарактеризуй уровень развития технологий в стране."),
+        ("религия_культура", "Опиши религию, культуру, искусство, традиции страны."),
+        ("управление", "Опиши систему управления, государственный строй, законы страны."),
+        ("стройка", "Опиши инфраструктуру, развитие строительства, важные объекты."),
+        ("общество", "Опиши общественные отношения, социальную структуру, классы общества страны."),
+    ]
+    loop = asyncio.get_event_loop()
+    aspect_results = []
+
+    # Для каждого аспекта: генерируем ответ моделью и сохраняем в БД
+    for code, prompt in aspect_prompts:
+        aspect_prompt = (
+            f"Название страны: {country}\n"
+            f"Описание страны: {user_text.strip()}\n"
+            f"{prompt}"
         )
-        user_name = message.from_user.username
-        await send_html(
-            bot,
-            ADMIN_CHAT_ID,
-            f"📨 Новая страна от пользователя {user_id} {user_name}:\n\n"
-            f"<b>Название:</b> {country}\n"
-            f"<b>Описание:</b> {await get_user_country_desc(user_id)}\n\n"
-            + "\n\n".join(summary_lines)
+        aspect_value = await loop.run_in_executor(
+            executor,
+            model_handler.generate_short_responce,
+            aspect_prompt,
         )
-        await answer_html(
-            message,
-            f"Игра начата! Действуй как правитель <b>{country}</b>.\n"
-            f"Ты можешь отдавать приказы, объявлять войны, строить города или устанавливать отношения с другими странами.\n"
-            f"В любой момент используй /new чтобы сбросить контекст."
-            "\n\nЧто будешь делать первым делом?"
-        )
+        logger.info(f"Аспект {code} страны {country}: {aspect_value}")
+        await set_user_aspect(user_id, code, aspect_value)
+        aspect_results.append((code, aspect_value))
+
+    typing_task.cancel()
+
+    # Формируем summary по аспектам для пользователя
+    summary_lines = []
+    for code, aspect_value in aspect_results:
+        label = next((label for (c, label, _) in ASPECTS if c == code), code.capitalize())
+        if aspect_value:
+            summary_lines.append(f"<b>{label}:</b>\n{stars_to_bold(aspect_value)}")
+
+    await answer_html(message,
+                        f"<b>Начальное состояние вашей страны:</b>\n\n" +
+                        "\n\n".join(summary_lines)
+                        )
+
+    user_name = message.from_user.username
+    await send_html(
+        bot,
+        ADMIN_CHAT_ID,
+        f"📨 Регистрация новой страны от пользователя {user_id} {user_name}:\n\n"
+        f"<b>Название страны:</b> {country}\n"
+        f"<b>Описание страны:</b>\n{user_text.strip()}\n\n" +
+        "\n\n".join(summary_lines)
+    )
+
+    # Переходим к игровому режиму
+    await answer_html(
+        message,
+        f"Игра начата! Действуй как правитель страны <b>{country}</b>.\n"
+        f"Ты можешь отдавать приказы, объявлять войны, строить города или устанавливать отношения с другими странами.\n"
+        f"В любой момент используй /new чтобы сбросить контекст."
+        "\n\nЧто будешь делать первым делом?"
+    )
 
 async def handle_game_dialog(message: types.Message, user_id: int, user_text: str):
     chat_id = message.chat.id
