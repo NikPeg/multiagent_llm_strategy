@@ -8,8 +8,12 @@ from concurrent.futures import ThreadPoolExecutor
 from model_handler import ModelHandler
 from database import *
 from parsing import stars_to_bold
+from utils import try_send_html, keep_typing
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
 logger = logging.getLogger(__name__)
 
 load_dotenv()
@@ -29,7 +33,7 @@ dp = Dispatcher()
 
 executor = ThreadPoolExecutor(max_workers=1)
 
-# Промпт для ролевого режима (передадим в модель первым контекстом!)
+# Промпт для ролевого режима
 RPG_PROMPT = (
     "Ты — ведущий ролевой текстовой игры в стиле геополитики древнего мира. "
     "Каждый игрок управляет страной, развивает её экономику, дипломатию "
@@ -62,7 +66,31 @@ async def new_chat(message: types.Message):
     await set_user_country_desc(user_id, None)
     await try_send_html(message, "⚔️Контекст диалога сброшен!⚔️")
 
-@dp.message(F.text)
+@dp.message(Command("admin_status"))
+async def admin_status(message: types.Message):
+    # Проверка, что запрос от администратора
+    if message.chat.id != ADMIN_CHAT_ID:
+        await try_send_html(message, "У вас нет прав на эту команду.")
+        return
+
+    # Получаем информацию о всех странах через специальную функцию
+    countries = await get_all_active_countries()
+
+    if not countries:
+        await try_send_html(message, "Активных стран не обнаружено.")
+        return
+
+    # Отправляем статус каждой страны
+    for user_id, country_name, status in countries:
+        await try_send_html(
+            message,
+            f"<b>Страна:</b> {country_name}\n"
+            f"<b>ID игрока:</b> {user_id}\n\n"
+            f"<b>Текущее состояние:</b>\n{stars_to_bold(status)}"
+        )
+
+# Основной обработчик обычных текстовых сообщений пользователя (НЕ команд)
+@dp.message(F.text & ~F.text.startswith('/'))
 async def handle_message(message: types.Message):
     user_id = message.from_user.id
     user_text = message.text
@@ -81,8 +109,7 @@ async def handle_country_name(message: types.Message, user_id: int, user_text: s
     await try_send_html(
         message,
         f"Название страны: <b>{user_text.strip()}</b>\n\n"
-        f"Теперь опиши кратко свою страну (география, особенности, народ, культура, стартовые условия):",
-        parse_mode="HTML"
+        f"Теперь опиши кратко свою страну (география, особенности, народ, культура, стартовые условия):"
     )
 
 async def handle_country_desc(message: types.Message, user_id: int, user_text: str):
@@ -92,7 +119,7 @@ async def handle_country_desc(message: types.Message, user_id: int, user_text: s
     # Генерируем начальное состояние страны после получения описания
     await try_send_html(message, "Создаю детальное описание состояния вашей страны...")
     chat_id = message.chat.id
-    typing_task = asyncio.create_task(keep_typing(chat_id))
+    typing_task = asyncio.create_task(keep_typing(bot, chat_id))
 
     initial_status_prompt = (
         f"Название страны: '{country}'\n"
@@ -114,17 +141,18 @@ async def handle_country_desc(message: types.Message, user_id: int, user_text: s
     # Показываем пользователю начальное состояние страны
     await try_send_html(
         message,
-        f"<b>Начальное состояние вашей страны:</b>\n\n{stars_to_bold(country_status)}",
+        f"<b>Начальное состояние вашей страны:</b>\n\n{stars_to_bold(country_status)}"
     )
     user_name = message.from_user.username
-    await bot.send_message(
-        ADMIN_CHAT_ID,
-        f"📨 Регистрация новой страны от пользователя {user_id} {user_name}:\n\n"
-        f"Название страны: <b>{country}</b>\n"
-        f"Описание страны:\n{user_text}\n\n"
-        f"<b>Состояние страны:</b>\n"
-        f"{country_status}",
-        parse_mode="HTML"
+    await try_send_html(
+        await bot.send_message(
+            ADMIN_CHAT_ID,
+            f"📨 Регистрация новой страны от пользователя {user_id} {user_name}:\n\n"
+            f"Название страны: <b>{country}</b>\n"
+            f"Описание страны:\n{user_text}\n\n"
+            f"<b>Состояние страны:</b>\n"
+            f"{country_status}"
+        )
     )
 
     # Завершаем установку и переходим к игре
@@ -138,25 +166,18 @@ async def handle_country_desc(message: types.Message, user_id: int, user_text: s
     )
     typing_task.cancel()
 
-async def try_send_html(message: types.Message, text: str, **kwargs):
-    try:
-        await message.answer(text, parse_mode="HTML", **kwargs)
-    except Exception as e:
-        logger.warning(f"Не удалось отправить текст в HTML, повторная отправка без форматирования... {str(e)}")
-        await message.answer(text, **kwargs)
-
 async def handle_game_dialog(message: types.Message, user_id: int, user_text: str):
     chat_id = message.chat.id
     user_name = message.from_user.username
     logger.info(f"Получено сообщение от пользователя {user_id} {user_name}: {user_text[:50]}...")
+
     try:
         await bot.send_chat_action(chat_id=chat_id, action="typing")
-        loop = asyncio.get_event_loop()
-        typing_task = asyncio.create_task(keep_typing(chat_id))
+        typing_task = asyncio.create_task(keep_typing(bot, chat_id))
         logger.info(f"Ожидание генерации ответа для пользователя {user_id}...")
         country_name = await get_user_country(user_id)
         country_desc = await get_user_country_desc(user_id)
-        assistant_reply, context = await loop.run_in_executor(
+        assistant_reply, context = await asyncio.get_event_loop().run_in_executor(
             executor,
             model_handler.sync_generate_response,
             user_id, user_text, RPG_PROMPT, country_name, country_desc, HISTORY_LIMIT
@@ -164,46 +185,23 @@ async def handle_game_dialog(message: types.Message, user_id: int, user_text: st
         logger.info(f"Ответ сгенерирован для пользователя {user_id}")
         typing_task.cancel()
         html_reply = stars_to_bold(assistant_reply)
-        try:
-            await try_send_html(message, html_reply)
-        except Exception as e:
-            logger.error(f"Ошибка при отправке сообщения с HTML: {str(e)}", exc_info=True)
-            await try_send_html(message, assistant_reply)
+
+        await try_send_html(message, html_reply)
         logger.info(f"Ответ отправлен пользователю {user_id}")
-        await bot.send_message(
-            ADMIN_CHAT_ID,
-            f"📨 Новый запрос от пользователя {user_id} {user_name}:\n\n"
-            f"<b>Промпт, переданный в модель:</b>\n"
-            f"<code>{context}</code>\n\n"
-            f"<b>Ответ модели:</b>\n"
-            f"<code>{assistant_reply}</code>"
+
+        await try_send_html(
+            await bot.send_message(
+                ADMIN_CHAT_ID,
+                f"📨 Новый запрос от пользователя {user_id} {user_name}:\n\n"
+                f"<b>Промпт, переданный в модель:</b>\n"
+                f"<code>{context}</code>\n\n"
+                f"<b>Ответ модели:</b>\n"
+                f"<code>{assistant_reply}</code>"
+            )
         )
     except Exception as e:
         logger.error(f"Ошибка при обработке сообщения: {str(e)}", exc_info=True)
         await try_send_html(message, f"Ошибка: {str(e)}")
-
-@dp.message(Command("admin_status"))
-async def admin_status(message: types.Message):
-    # Проверка, что запрос от администратора
-    if message.chat.id != ADMIN_CHAT_ID:
-        await try_send_html(message, "У вас нет прав на эту команду.")
-        return
-
-    # Получаем информацию о всех странах через специальную функцию
-    countries = await get_all_active_countries()
-
-    if not countries:
-        await try_send_html(message, "Активных стран не обнаружено.")
-        return
-
-    # Отправляем статус каждой страны
-    for user_id, country_name, status in countries:
-        await try_send_html(
-            message,
-            f"<b>Страна:</b> {country_name}\n"
-            f"<b>ID игрока:</b> {user_id}\n\n"
-            f"<b>Текущее состояние:</b>\n{stars_to_bold(status)}",
-        )
 
 async def update_country_status(user_id, country_name, country_desc, action):
     """Обновляет состояние страны после действия игрока"""
@@ -226,18 +224,6 @@ async def update_country_status(user_id, country_name, country_desc, action):
 
     await set_country_status(user_id, new_status)
     return new_status
-
-async def keep_typing(chat_id):
-    try:
-        typing_count = 0
-        while True:
-            await bot.send_chat_action(chat_id=chat_id, action="typing")
-            typing_count += 1
-            await asyncio.sleep(3)
-    except asyncio.CancelledError:
-        pass
-    except Exception as e:
-        logger.error(f"Ошибка в keep_typing: {str(e)}", exc_info=True)
 
 async def main():
     logger.info("Инициализация базы данных...")
