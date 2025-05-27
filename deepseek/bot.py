@@ -139,7 +139,14 @@ async def handle_country_desc(message: types.Message, user_id: int, user_text: s
         ("общество", "Общественные отношения, социальная структура, классы общества страны:"),
     ]
     loop = asyncio.get_event_loop()
-    aspect_results = []
+    user_name = message.from_user.username
+    await send_html(
+        bot,
+        ADMIN_CHAT_ID,
+        f"📨 Регистрация новой страны от пользователя {user_id} {user_name}:\n\n"
+        f"<b>Название страны:</b> {country}\n"
+        f"<b>Описание страны:</b>\n{user_text.strip()}\n\n"
+    )
 
     # Для каждого аспекта: генерируем ответ моделью и сохраняем в БД
     for code, prompt in aspect_prompts:
@@ -154,32 +161,13 @@ async def handle_country_desc(message: types.Message, user_id: int, user_text: s
             aspect_prompt,
         )
         logger.info(f"Аспект {code} страны {country}: {aspect_value}")
+        await answer_html(
+            message,
+            f"Аспект {code} страны {country}: {aspect_value}"
+        )
         await set_user_aspect(user_id, code, aspect_value)
-        aspect_results.append((code, aspect_value))
 
     typing_task.cancel()
-
-    # Формируем summary по аспектам для пользователя
-    summary_lines = []
-    for code, aspect_value in aspect_results:
-        label = next((label for (c, label, _) in ASPECTS if c == code), code.capitalize())
-        if aspect_value:
-            summary_lines.append(f"<b>{label}:</b>\n{stars_to_bold(aspect_value)}")
-
-    await answer_html(message,
-                        f"<b>Начальное состояние вашей страны:</b>\n\n" +
-                        "\n\n".join(summary_lines)
-                        )
-
-    user_name = message.from_user.username
-    await send_html(
-        bot,
-        ADMIN_CHAT_ID,
-        f"📨 Регистрация новой страны от пользователя {user_id} {user_name}:\n\n"
-        f"<b>Название страны:</b> {country}\n"
-        f"<b>Описание страны:</b>\n{user_text.strip()}\n\n" +
-        "\n\n".join(summary_lines)
-    )
 
     # Переходим к игровому режиму
     await answer_html(
