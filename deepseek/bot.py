@@ -178,6 +178,17 @@ async def handle_country_desc(message: types.Message, user_id: int, user_text: s
         "\n\nЧто будешь делать первым делом?"
     )
 
+# Промпт для ролевого режима
+RPG_PROMPT = (
+    "Ты — ведущий ролевой текстовой игры в стиле геополитики древнего мира. "
+    "Каждый игрок управляет страной, развивает её экономику, дипломатию "
+    "и армию, строит отношения с соседями и принимает решения. "
+    "Цель — сделать свою страну процветающей и могущественной, "
+    "любое решение должно иметь последствия! Ты рассказываешь, что происходит, "
+    "отвечаешь только от лица мастера игры, четко следуя выбранному игроком сеттингу, "
+    "никогда не отступаешь от выбранной роли."
+)
+
 async def handle_game_dialog(message: types.Message, user_id: int, user_text: str):
     chat_id = message.chat.id
     user_name = message.from_user.username
@@ -189,21 +200,11 @@ async def handle_game_dialog(message: types.Message, user_id: int, user_text: st
         logger.info(f"Ожидание генерации ответа для пользователя {user_id}...")
         country_name = await get_user_country(user_id)
         country_desc = await get_user_country_desc(user_id)
-        # Можно собрать аспекты в один status для модельки при необходимости
-        aspects = [await get_user_aspect(user_id, code) for code in ASPECT_KEYS]
-        aspects_str = "\n".join(
-            f"{label}: {value}" for (code, label, _), value in zip(ASPECTS, aspects) if value
-        )
-        prompt_context = (
-                f"Название страны: '{country_name}'\n"
-                f"Описание страны: {country_desc}\n"
-                + aspects_str
-        )
 
         assistant_reply, context = await asyncio.get_event_loop().run_in_executor(
             executor,
             model_handler.sync_generate_response,
-            user_id, user_text, prompt_context, country_name, country_desc, HISTORY_LIMIT
+            user_id, user_text, RPG_PROMPT, country_name, country_desc, HISTORY_LIMIT
         )
         logger.info(f"Ответ сгенерирован для пользователя {user_id}")
         typing_task.cancel()
