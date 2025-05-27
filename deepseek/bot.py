@@ -189,6 +189,11 @@ async def handle_country_desc(message: types.Message, user_id: int, user_text: s
         model_handler.generate_short_responce,
         desc_prompt,
     )
+    await send_html(
+        bot,
+        ADMIN_CHAT_ID,
+        f"<b>Описание</b> страны {country}: {description}{"" if description.endswith(".") else "."}"
+    )
     await set_user_country_desc(user_id, description)
 
     typing_task.cancel()
