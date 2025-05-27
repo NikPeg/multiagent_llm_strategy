@@ -61,9 +61,6 @@ async def start(message: types.Message):
 async def new_chat(message: types.Message):
     user_id = message.from_user.id
     await clear_history(user_id)
-    await clear_user_state(user_id)
-    await set_user_country(user_id, None)
-    await set_user_country_desc(user_id, None)
     await answer_html(message, "⚔️Контекст диалога сброшен!⚔️")
 
 @dp.message(Command("admin_status"))
@@ -145,6 +142,7 @@ async def handle_country_desc(message: types.Message, user_id: int, user_text: s
     )
     user_name = message.from_user.username
     await send_html(
+        bot,
         ADMIN_CHAT_ID,
         f"📨 Регистрация новой страны от пользователя {user_id} {user_name}:\n\n"
         f"Название страны: <b>{country}</b>\n"
@@ -188,6 +186,7 @@ async def handle_game_dialog(message: types.Message, user_id: int, user_text: st
         logger.info(f"Ответ отправлен пользователю {user_id}")
 
         await send_html(
+            bot,
             ADMIN_CHAT_ID,
             f"📨 Новый запрос от пользователя {user_id} {user_name}:\n\n"
             f"<b>Промпт, переданный в модель:</b>\n"
