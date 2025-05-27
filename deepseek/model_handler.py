@@ -1,14 +1,14 @@
-import logging
 import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from database import get_history, update_history
-from parsing import *
+from utils import *
 
 logger = logging.getLogger(__name__)
 
 class ModelHandler:
-    def __init__(self, max_new_tokens):
+    def __init__(self, max_new_tokens, short_new_tokens):
         self.max_new_tokens = max_new_tokens
+        self.short_new_tokens = short_new_tokens
         self._initialize_model()
 
     def _initialize_model(self):
@@ -80,7 +80,7 @@ class ModelHandler:
             inputs = self.tokenizer(prompt, return_tensors="pt").to(self.model.device)
             outputs = self.model.generate(
                 **inputs,
-                max_new_tokens=self.max_new_tokens,
+                max_new_tokens=self.short_new_tokens,
                 do_sample=True,
                 temperature=0.7,
                 top_p=0.95,
@@ -90,7 +90,7 @@ class ModelHandler:
             response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
 
             # Чистим ответ ассистента
-            ai_response = clean_ai_response(response[len(prompt):].strip())
+            ai_response = clean_ai_response(response[len(prompt):].strip(), '\n')
 
             loop.close()
             return ai_response

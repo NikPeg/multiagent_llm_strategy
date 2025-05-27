@@ -7,8 +7,7 @@ from aiogram.filters import Command
 from concurrent.futures import ThreadPoolExecutor
 from model_handler import ModelHandler
 from database import *
-from parsing import stars_to_bold
-from utils import answer_html, send_html, keep_typing
+from utils import *
 
 logging.basicConfig(
     level=logging.INFO,
@@ -21,11 +20,12 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID"))
 HISTORY_LIMIT = int(os.getenv("HISTORY_LIMIT", 4))
 MAX_NEW_TOKENS = int(os.getenv("MAX_NEW_TOKENS", 512))
+SHORT_NEW_TOKENS = int(os.getenv("SHORT_NEW_TOKENS", 200))
 
 if not BOT_TOKEN:
     raise ValueError("Токен бота не найден в .env!")
 
-model_handler = ModelHandler(MAX_NEW_TOKENS)
+model_handler = ModelHandler(MAX_NEW_TOKENS, SHORT_NEW_TOKENS)
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 executor = ThreadPoolExecutor(max_workers=1)
