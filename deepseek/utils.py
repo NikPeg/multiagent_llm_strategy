@@ -3,7 +3,7 @@ import asyncio
 
 logger = logging.getLogger(__name__)
 
-async def try_send_html(message, text: str, **kwargs):
+async def answer_html(message, text: str, **kwargs):
     """
     Безопасная отправка сообщения с parse_mode="HTML".
     Если возникает ошибка (например, некорректные теги), повторно отправляет текст без форматирования.
@@ -13,6 +13,17 @@ async def try_send_html(message, text: str, **kwargs):
     except Exception as e:
         logger.warning(f"Не удалось отправить сообщение в HTML: {str(e)}. Пробуем отправить без форматирования.")
         await message.answer(text, **kwargs)
+
+async def send_html(bot, chat_id, text: str, **kwargs):
+    """
+    Безопасная отправка сообщения в чат (канал, группу или user) с parse_mode="HTML".
+    Если отправка в HTML не удалась, повторяет без форматирования.
+    """
+    try:
+        await bot.send_message(chat_id, text, parse_mode="HTML", **kwargs)
+    except Exception as e:
+        logger.warning(f"Не удалось отправить сообщение в HTML (bot.send_message): {str(e)}. Пробуем без форматирования.")
+        await bot.send_message(chat_id, text, **kwargs)
 
 async def keep_typing(bot, chat_id):
     """
