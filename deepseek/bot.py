@@ -48,6 +48,7 @@ async def start(message: types.Message):
     await set_user_country(user_id, None)
     await set_user_country_desc(user_id, None)
     await try_send_html(
+        message,
         "Добро пожаловать в ролевую геополитическую игру эпохи древнего мира!\n\n"
         "Для начала игры укажи название своей страны:"
     )
@@ -59,7 +60,7 @@ async def new_chat(message: types.Message):
     await clear_user_state(user_id)
     await set_user_country(user_id, None)
     await set_user_country_desc(user_id, None)
-    await try_send_html("⚔️Контекст диалога сброшен!⚔️")
+    await try_send_html(message, "⚔️Контекст диалога сброшен!⚔️")
 
 @dp.message(F.text)
 async def handle_message(message: types.Message):
@@ -78,6 +79,7 @@ async def handle_country_name(message: types.Message, user_id: int, user_text: s
     await set_user_country(user_id, user_text.strip())
     await set_user_state(user_id, 'waiting_for_country_desc')
     await try_send_html(
+        message,
         f"Название страны: <b>{user_text.strip()}</b>\n\n"
         f"Теперь опиши кратко свою страну (география, особенности, народ, культура, стартовые условия):",
         parse_mode="HTML"
@@ -88,7 +90,7 @@ async def handle_country_desc(message: types.Message, user_id: int, user_text: s
     country = await get_user_country(user_id)
 
     # Генерируем начальное состояние страны после получения описания
-    await try_send_html("Создаю детальное описание состояния вашей страны...")
+    await try_send_html(message, "Создаю детальное описание состояния вашей страны...")
     chat_id = message.chat.id
     typing_task = asyncio.create_task(keep_typing(chat_id))
 
@@ -111,8 +113,8 @@ async def handle_country_desc(message: types.Message, user_id: int, user_text: s
 
     # Показываем пользователю начальное состояние страны
     await try_send_html(
+        message,
         f"<b>Начальное состояние вашей страны:</b>\n\n{stars_to_bold(country_status)}",
-        parse_mode="HTML"
     )
     user_name = message.from_user.username
     await bot.send_message(
@@ -178,7 +180,7 @@ async def handle_game_dialog(message: types.Message, user_id: int, user_text: st
         )
     except Exception as e:
         logger.error(f"Ошибка при обработке сообщения: {str(e)}", exc_info=True)
-        await try_send_html(f"Ошибка: {str(e)}")
+        await try_send_html(message, f"Ошибка: {str(e)}")
 
 @dp.message(Command("admin_status"))
 async def admin_status(message: types.Message):
