@@ -135,7 +135,6 @@ async def handle_country_name(message: types.Message, user_id: int, user_text: s
     )
 
 async def handle_country_desc(message: types.Message, user_id: int, user_text: str):
-    await set_user_country_desc(user_id, user_text.strip())
     country = await get_user_country(user_id)
     chat_id = message.chat.id
 
@@ -151,6 +150,7 @@ async def handle_country_desc(message: types.Message, user_id: int, user_text: s
         f"<b>Название страны:</b> {country}\n"
         f"<b>Описание страны:</b>\n{user_text.strip()}\n\n"
     )
+    all_aspects = []
 
     # Для каждого аспекта: генерируем ответ моделью и сохраняем в БД
     for code, label, prompt in ASPECTS:
@@ -165,7 +165,6 @@ async def handle_country_desc(message: types.Message, user_id: int, user_text: s
             model_handler.generate_short_responce,
             aspect_prompt,
         )
-        logger.info(f"Аспект {label} страны {country}: {aspect_value}")
         await answer_html(
             message,
             f"<b>{label}</b> страны {country}: {aspect_value}{"" if aspect_value.endswith(".") else "."}"
@@ -176,6 +175,21 @@ async def handle_country_desc(message: types.Message, user_id: int, user_text: s
             f"<b>{label}</b> страны {country}: {aspect_value}{"" if aspect_value.endswith(".") else "."}"
         )
         await set_user_aspect(user_id, code, aspect_value)
+        all_aspects.append(aspect_value)
+
+    desc_prompt = (
+        f"{GAME_PROMPT}"
+        f"Название страны: {country}\n"
+        f"Описание страны: {user_text.strip()}\n"
+        f"{"\n".join(all_aspects)}"
+        "Краткое описание страны: "
+    )
+    description = await loop.run_in_executor(
+        executor,
+        model_handler.generate_short_responce,
+        desc_prompt,
+    )
+    await set_user_country_desc(user_id, description)
 
     typing_task.cancel()
 
