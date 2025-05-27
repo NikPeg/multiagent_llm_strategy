@@ -20,7 +20,7 @@ BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID"))
 HISTORY_LIMIT = int(os.getenv("HISTORY_LIMIT", 4))
 MAX_NEW_TOKENS = int(os.getenv("MAX_NEW_TOKENS", 512))
-SHORT_NEW_TOKENS = int(os.getenv("SHORT_NEW_TOKENS", 200))
+SHORT_NEW_TOKENS = int(os.getenv("SHORT_NEW_TOKENS", 250))
 
 GAME_PROMPT = (
     "Ты — ведущий ролевой текстовой игры в стиле геополитики древнего мира. "
@@ -47,7 +47,7 @@ executor = ThreadPoolExecutor(max_workers=1)
 
 # Список аспектов страны: (кодовое_поле, человекочитаемое_название, вопрос)
 ASPECTS = [
-    ("экономика", "Экономика", "Подробное состояние экономики страны:"),
+    ("экономика", "Экономика", "Начальное состояние экономики страны:"),
     ("военное_дело", "Военное дело", "Военная организация, численность армии и оборона страны:"),
     ("внеш_политика", "Внешняя политика", "Внешняя политика страны, отношения с соседями:"),
     ("территория", "Территория", "Территория, география, природные особенности страны:"),
@@ -168,12 +168,12 @@ async def handle_country_desc(message: types.Message, user_id: int, user_text: s
         logger.info(f"Аспект {label} страны {country}: {aspect_value}")
         await answer_html(
             message,
-            f"<b>{label}</b> страны {country}: {aspect_value}"
+            f"<b>{label}</b> страны {country}: {aspect_value}{"" if aspect_value.endswith(".") else "."}"
         )
         await send_html(
             bot,
             ADMIN_CHAT_ID,
-            f"<b>{label}</b> страны {country}: {aspect_value}"
+            f"<b>{label}</b> страны {country}: {aspect_value}{"" if aspect_value.endswith(".") else "."}"
         )
         await set_user_aspect(user_id, code, aspect_value)
 
