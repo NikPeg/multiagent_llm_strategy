@@ -9,6 +9,7 @@ from random import sample, shuffle, randint
 from concurrent.futures import ThreadPoolExecutor
 from model_handler import ModelHandler
 from utils import answer_html
+from types import SimpleNamespace
 
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
@@ -133,7 +134,7 @@ async def setup_game(message, n_players, n_mafia):
         reply_markup=get_next_button()
     )
     await answer_html(
-        types.SimpleNamespace(answer=lambda text, **kwargs: bot.send_message(ADMIN_CHAT_ID, text, **kwargs)),
+        SimpleNamespace(answer=lambda text, **kwargs: bot.send_message(ADMIN_CHAT_ID, text, **kwargs)),
         "Запущена игра в мафию.\n" + "\n\n".join(awaiting)
     )
 
@@ -182,7 +183,7 @@ async def next_player_phase(message):
         f"{speech}"
     )
     await answer_html(
-        types.SimpleNamespace(answer=lambda text, **kwargs: bot.send_message(ADMIN_CHAT_ID, text, **kwargs)),
+        SimpleNamespace(answer=lambda text, **kwargs: bot.send_message(ADMIN_CHAT_ID, text, **kwargs)),
         admin_report
     )
     game['step'] += 1
@@ -216,7 +217,7 @@ async def voting_phase(message):
         reply_markup=get_next_button()
     )
     await answer_html(
-        types.SimpleNamespace(answer=lambda text, **kwargs: bot.send_message(ADMIN_CHAT_ID, text, **kwargs)),
+        SimpleNamespace(answer=lambda text, **kwargs: bot.send_message(ADMIN_CHAT_ID, text, **kwargs)),
         "<b>Голоса:</b>\n" + "\n".join(results) + f"\n\n<b>{names[most_voted]} выбыл из игры!</b>"
     )
     mafia_alive = sum([game['roles'][i] == 'мафия' and game['alive'][i] for i in range(len(names))])
@@ -228,7 +229,7 @@ async def voting_phase(message):
             reply_markup=remove_keyboard()
         )
         await answer_html(
-            types.SimpleNamespace(answer=lambda text, **kwargs: bot.send_message(ADMIN_CHAT_ID, text, **kwargs)),
+            SimpleNamespace(answer=lambda text, **kwargs: bot.send_message(ADMIN_CHAT_ID, text, **kwargs)),
             "Мирные победили! Игра окончена."
         )
         game['state'] = 'over'
@@ -240,7 +241,7 @@ async def voting_phase(message):
             reply_markup=remove_keyboard()
         )
         await answer_html(
-            types.SimpleNamespace(answer=lambda text, **kwargs: bot.send_message(ADMIN_CHAT_ID, text, **kwargs)),
+            SimpleNamespace(answer=lambda text, **kwargs: bot.send_message(ADMIN_CHAT_ID, text, **kwargs)),
             "Мафия победила! Игра окончена."
         )
         game['state'] = 'over'
@@ -252,7 +253,7 @@ async def voting_phase(message):
             reply_markup=get_next_button()
         )
         await answer_html(
-            types.SimpleNamespace(answer=lambda text, **kwargs: bot.send_message(ADMIN_CHAT_ID, text, **kwargs)),
+            SimpleNamespace(answer=lambda text, **kwargs: bot.send_message(ADMIN_CHAT_ID, text, **kwargs)),
             "Продолжается следующий круг. Введите 'Далее'."
         )
 
