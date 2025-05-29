@@ -161,7 +161,7 @@ async def next_player_phase(message):
     name = names[step]
     prompt = prompts[step]
     role = roles[step]
-    aspect_prompt = f"Ты игрок {name}, твоя роль: {role}. Вот твоя информация: {prompt}\nСкажи свою речь на голосовании."
+    aspect_prompt = f"Ты игрок {name}, твоя роль: {role}. Вот твоя информация: {prompt}\nСкажи свою речь на голосовании.\n{name}:"
     typing_task = asyncio.create_task(send_typing(message.chat.id))
     loop = asyncio.get_event_loop()
     speech = await loop.run_in_executor(
