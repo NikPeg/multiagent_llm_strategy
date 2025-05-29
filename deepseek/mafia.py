@@ -8,17 +8,20 @@ from dotenv import load_dotenv
 from random import sample, shuffle, randint
 from concurrent.futures import ThreadPoolExecutor
 from model_handler import ModelHandler
-from utils import try_send_html
+from utils import answer_html
 
 load_dotenv()
 BOT_TOKEN = os.getenv("BOT_TOKEN")
 ADMIN_CHAT_ID = int(os.getenv("ADMIN_CHAT_ID"))
+HISTORY_LIMIT = int(os.getenv("HISTORY_LIMIT", 4))
+MAX_NEW_TOKENS = int(os.getenv("MAX_NEW_TOKENS", 512))
+SHORT_NEW_TOKENS = int(os.getenv("SHORT_NEW_TOKENS", 250))
 
 logging.basicConfig(level=logging.INFO)
 bot = Bot(token=BOT_TOKEN)
 dp = Dispatcher()
 executor = ThreadPoolExecutor(max_workers=1)
-model_handler = ModelHandler(max_new_tokens=128)
+model_handler = ModelHandler(max_new_tokens=MAX_NEW_TOKENS, short_new_tokens=SHORT_NEW_TOKENS)
 
 NAMES = [
     "Иван", "Петр", "Алексей", "Дмитрий", "Сергей", "Михаил",
@@ -53,7 +56,7 @@ async def send_typing(chat_id):
 @dp.message(Command("start"))
 async def start(message: types.Message):
     game.clear()
-    await try_send_html(
+    await answer_html(
         message,
         "Добро пожаловать в игру 'Мафия'. Введите количество игроков (от 4 до 12):",
         reply_markup=remove_keyboard()
@@ -68,23 +71,23 @@ async def handler(message: types.Message):
             n_players = int(user_text)
             if 4 <= n_players <= 12:
                 game['n_players'] = n_players
-                await try_send_html(message, "Сколько должно быть мафий (1 или 2)?")
+                await answer_html(message, "Сколько должно быть мафий (1 или 2)?")
                 game['state'] = 'wait_mafia'
             else:
-                await try_send_html(message, "Введите число от 4 до 12")
+                await answer_html(message, "Введите число от 4 до 12")
         except:
-            await try_send_html(message, "Пожалуйста, введите целое число.")
+            await answer_html(message, "Пожалуйста, введите целое число.")
         return
 
     if game.get('state') == 'wait_mafia':
         try:
             n_mafia = int(user_text)
             if n_mafia not in (1, 2) or n_mafia >= game['n_players']:
-                await try_send_html(message, "Мафий должно быть 1 или 2, и меньше чем всех игроков.")
+                await answer_html(message, "Мафий должно быть 1 или 2, и меньше чем всех игроков.")
                 return
             await setup_game(message, game['n_players'], n_mafia)
         except:
-            await try_send_html(message, "Пожалуйста, напишите 1 или 2.")
+            await answer_html(message, "Пожалуйста, напишите 1 или 2.")
         return
 
     if user_text.lower() == "далее" and game.get('state') == 'game':
@@ -124,12 +127,12 @@ async def setup_game(message, n_players, n_mafia):
     for i, (name, role, prompt) in enumerate(zip(names, roles, prompts)):
         txt = f"Игрок {name}: {prompt}"
         awaiting.append(txt)
-    await try_send_html(
+    await answer_html(
         message,
         "Роли розданы. Нажмите 'Далее', чтобы начать игру. Далее каждый игрок будет произносить свою речь.",
         reply_markup=get_next_button()
     )
-    await try_send_html(
+    await answer_html(
         types.SimpleNamespace(answer=lambda text, **kwargs: bot.send_message(ADMIN_CHAT_ID, text, **kwargs)),
         "Запущена игра в мафию.\n" + "\n\n".join(awaiting)
     )
@@ -147,7 +150,7 @@ async def next_player_phase(message):
         step = game['step']
 
     if step >= total:
-        await try_send_html(
+        await answer_html(
             message,
             "Все игроки выступили, напишите 'Голосование' чтобы перейти к голосованию.",
             reply_markup=get_vote_button()
@@ -167,7 +170,7 @@ async def next_player_phase(message):
     )
     typing_task.cancel()
 
-    await try_send_html(
+    await answer_html(
         message,
         f"🗣 <b>{name}:</b>\n{speech}",
         reply_markup=get_next_button()
@@ -178,7 +181,7 @@ async def next_player_phase(message):
         f"🗣 <b>{name}:</b>\n"
         f"{speech}"
     )
-    await try_send_html(
+    await answer_html(
         types.SimpleNamespace(answer=lambda text, **kwargs: bot.send_message(ADMIN_CHAT_ID, text, **kwargs)),
         admin_report
     )
@@ -202,53 +205,53 @@ async def voting_phase(message):
     most_voted = max(votes.items(), key=lambda x: len(x[1]))[0]
     game['alive'][most_voted] = False
     game['step'] = 0
-    await try_send_html(
+    await answer_html(
         message,
         "<b>Голоса:</b>\n" + "\n".join(results),
         reply_markup=get_next_button()
     )
-    await try_send_html(
+    await answer_html(
         message,
         f"<b>{names[most_voted]} выбыл из игры!</b>",
         reply_markup=get_next_button()
     )
-    await try_send_html(
+    await answer_html(
         types.SimpleNamespace(answer=lambda text, **kwargs: bot.send_message(ADMIN_CHAT_ID, text, **kwargs)),
         "<b>Голоса:</b>\n" + "\n".join(results) + f"\n\n<b>{names[most_voted]} выбыл из игры!</b>"
     )
     mafia_alive = sum([game['roles'][i] == 'мафия' and game['alive'][i] for i in range(len(names))])
     city_alive = sum([game['roles'][i] == 'мирный' and game['alive'][i] for i in range(len(names))])
     if mafia_alive == 0:
-        await try_send_html(
+        await answer_html(
             message,
             "Мирные победили! Игра окончена.",
             reply_markup=remove_keyboard()
         )
-        await try_send_html(
+        await answer_html(
             types.SimpleNamespace(answer=lambda text, **kwargs: bot.send_message(ADMIN_CHAT_ID, text, **kwargs)),
             "Мирные победили! Игра окончена."
         )
         game['state'] = 'over'
         return
     elif city_alive <= mafia_alive:
-        await try_send_html(
+        await answer_html(
             message,
             "Мафия победила! Игра окончена.",
             reply_markup=remove_keyboard()
         )
-        await try_send_html(
+        await answer_html(
             types.SimpleNamespace(answer=lambda text, **kwargs: bot.send_message(ADMIN_CHAT_ID, text, **kwargs)),
             "Мафия победила! Игра окончена."
         )
         game['state'] = 'over'
         return
     else:
-        await try_send_html(
+        await answer_html(
             message,
             "Продолжается следующий круг. Введите 'Далее'.",
             reply_markup=get_next_button()
         )
-        await try_send_html(
+        await answer_html(
             types.SimpleNamespace(answer=lambda text, **kwargs: bot.send_message(ADMIN_CHAT_ID, text, **kwargs)),
             "Продолжается следующий круг. Введите 'Далее'."
         )
