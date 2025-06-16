@@ -8,11 +8,17 @@ from database import (
     get_user_id_by_country,
     get_user_aspect,
     set_user_aspect,
+    get_user_country_desc,
+    set_user_country_desc,
+    clear_history,
+    clear_user_aspects,
+    set_user_country,
+    set_user_country_desc,
+    set_aspect_index,
 )
 from utils import answer_html, send_html, stars_to_bold
 from .fsm import EditAspect
 from game import ASPECTS
-from database import clear_history, clear_user_aspects, set_user_country, set_user_country_desc, set_aspect_index
 
 router = Router()
 
@@ -42,6 +48,9 @@ async def info(message: types.Message):
 
     aspect_labels = {a[0]: a[1] for a in ASPECTS}
     aspect_codes = list(aspect_labels.keys())
+    # --- Добавляем "описание" как виртуальный аспект ---
+    aspect_labels["описание"] = "Описание страны"
+    aspect_codes.append("описание")
 
     # HELP
     if args and args[0].lower() in ("help", "справка", "?"):
@@ -58,8 +67,8 @@ async def info(message: types.Message):
         await send_html(message.bot, ADMIN_CHAT_ID, help_text)
         return
 
+    # /info
     if not args:
-        # Все страны и их аспекты
         for country_tuple in countries:
             user_id, country_name, country_desc, *aspect_values = country_tuple
             await send_html(
@@ -81,9 +90,22 @@ async def info(message: types.Message):
                     )
         return
 
+    # /info <аспект>  или  /info <страна>
     if len(args) == 1:
         arg = args[0].lower()
-        if arg in aspect_labels:
+        # Все описания стран
+        if arg == "описание":
+            for country_tuple in countries:
+                country_name = country_tuple[1]
+                user_id = country_tuple[0]
+                desc = await get_user_country_desc(user_id)
+                if desc and desc.strip():
+                    await send_html(
+                        message.bot, ADMIN_CHAT_ID,
+                        f"<b>{country_name}</b> (ID: {user_id}):\n<b>Описание страны:</b>\n{desc}"
+                    )
+            return
+        if arg in aspect_labels and arg != "описание":
             idx = aspect_codes.index(arg)
             for country_tuple in countries:
                 country_name = country_tuple[1]
@@ -116,6 +138,7 @@ async def info(message: types.Message):
         await answer_html(message, "Не найдено ни страны, ни аспекта с таким названием.")
         return
 
+    # /info <страна> <аспект>
     if len(args) == 2:
         country = args[0].lower()
         aspect = args[1].lower()
@@ -124,6 +147,21 @@ async def info(message: types.Message):
             return
         if aspect not in aspect_labels:
             await answer_html(message, "Аспект не найден.")
+            return
+        if aspect == "описание":
+            desc = await get_user_country_desc(countries_dict[country]['user_id'])
+            if desc and desc.strip():
+                await send_html(
+                    message.bot,
+                    ADMIN_CHAT_ID,
+                    f"<b>Описание страны</b> для <b>{countries_dict[country]['country_name']}</b>:\n{desc}"
+                )
+            else:
+                await send_html(
+                    message.bot,
+                    ADMIN_CHAT_ID,
+                    f"Описание страны для <b>{countries_dict[country]['country_name']}</b> не найдено."
+                )
             return
         idx = aspect_codes.index(aspect)
         value = countries_dict[country]["aspects"][idx]
@@ -170,6 +208,18 @@ async def admin_edit(message: types.Message, state: FSMContext):
         await answer_html(message, f'Страна "{country_name}" не найдена.')
         return
 
+    # --- Изменение описания страны как "виртуального" аспекта ---
+    if aspect_code == "описание":
+        current_value = await get_user_country_desc(user_id)
+        await answer_html(
+            message,
+            f"<b>Описание страны</b> для <b>{country_name}</b>:\n\n{current_value or '(нет данных)'}\n\n"
+            "Введите новый текст для этого поля, или /cancel для отмены."
+        )
+        await state.set_state(EditAspect.waiting_new_value)
+        await state.update_data(user_id=user_id, aspect_code=aspect_code, country_name=country_name)
+        return
+
     if aspect_code not in [a[0] for a in ASPECTS]:
         await answer_html(message, f'Аспект "{aspect_code}" не найден.')
         return
@@ -197,9 +247,17 @@ async def process_new_value(message: types.Message, state: FSMContext):
     country_name = data["country_name"]
     new_value = message.text.strip()
 
-    await set_user_aspect(user_id, aspect_code, new_value)
-    label = dict((a[0], a[1]) for a in ASPECTS)[aspect_code]
+    if aspect_code == "описание":
+        await set_user_country_desc(user_id, new_value)
+        await answer_html(
+            message,
+            f"<b>Описание страны</b> для <b>{country_name}</b> успешно обновлено!"
+        )
+        await state.clear()
+        return
 
+    await set_user_aspect(user_id, aspect_code, new_value)
+    label = dict((a[0], a[1]) for a in ASPECTS).get(aspect_code, aspect_code)
     await answer_html(
         message,
         f"<b>{label}</b> для страны <b>{country_name}</b> успешно обновлён!"
@@ -223,8 +281,6 @@ async def admin_delete_country(message: types.Message):
         await answer_html(message, f'Страна "{country_name}" не найдена.')
         return
 
-    # Импорт и удаление данных страны
-
     await clear_history(user_id)
     await clear_user_aspects(user_id)
     await set_user_country(user_id, None)
@@ -232,6 +288,28 @@ async def admin_delete_country(message: types.Message):
     await set_aspect_index(user_id, None)
 
     await answer_html(message, f'Страна "{country_name}" и все связанные данные удалены.')
+
+@router.message(Command("help"))
+async def admin_help(message: types.Message):
+    if message.chat.id != ADMIN_CHAT_ID:
+        await answer_html(message, "У вас нет прав на эту команду.")
+        return
+    await answer_html(
+        message,
+        "<b>Админ-команды:</b>\n\n"
+        "<b>/info</b> — информация по странам/аспектам\n"
+        "  /info — список всех стран и аспектов\n"
+        "  /info &lt;страна&gt; — все аспекты и описание страны\n"
+        "  /info &lt;аспект&gt; — один аспект для всех стран\n"
+        "  /info &lt;страна&gt; &lt;аспект&gt; — аспект определённой страны\n"
+        "  /info (описание работает как отдельный \"аспект\")\n\n"
+        "<b>/edit &lt;страна&gt; &lt;аспект/описание&gt;</b> — изменить значение любого аспекта или описание страны (через диалог)\n\n"
+        "<b>/del_country &lt;страна&gt;</b> — полностью удалить страну (история, описание и аспекты)\n\n"
+        "<b>/help</b> — эта справка\n"
+        "\n<b>Доступные аспекты:</b>\n"
+        + "\n".join(f"<b>{a[0]}</b>: {a[1]}" for a in ASPECTS) +
+        "\n<b>описание</b>: Описание страны"
+    )
 
 def register(dp):
     dp.include_router(router)
