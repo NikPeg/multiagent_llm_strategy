@@ -16,7 +16,6 @@ async def handle_country_name(message, user_id: int, user_text: str):
         message,
         f"Название страны: <b>{user_text}</b>\n\n"
         f"Теперь опиши кратко свою страну (география, особенности, народ, культура, стартовые условия):",
-        reply_markup=ASPECTS_KEYBOARD,
     )
 
 async def handle_country_desc(message, user_id: int, user_text: str):
