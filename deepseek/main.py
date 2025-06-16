@@ -1,27 +1,31 @@
 import asyncio
 import logging
 
-from config import BOT_TOKEN
-from handlers import dp, bot
-from database import init_db
+from aiogram import Bot, Dispatcher
+from aiogram.fsm.storage.memory import MemoryStorage
 
+from config import BOT_TOKEN
+from handlers import register_handlers
+
+# Настройка логов
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format='[%(asctime)s] %(levelname)s %(name)s: %(message)s'
 )
 logger = logging.getLogger(__name__)
 
-async def main():
-    logger.info("Инициализация базы данных...")
-    await init_db()
-    logger.info("Запуск бота...")
-    await dp.start_polling(bot)
+def main():
+    # Создаем бота и диспетчер
+    bot = Bot(token=BOT_TOKEN, parse_mode="HTML")
+    dp = Dispatcher(storage=MemoryStorage())
+
+    # Регистрируем все хендлеры
+    register_handlers(dp)
+
+    # Запуск поллинга
+    logger.info("Бот запущен")
+    asyncio.run(dp.start_polling(bot))
+
 
 if __name__ == "__main__":
-    try:
-        logger.info("Запуск приложения...")
-        asyncio.run(main())
-    except (KeyboardInterrupt, SystemExit):
-        logger.info("Приложение завершено")
-    except Exception as e:
-        logger.critical(f"Критическая ошибка: {str(e)}", exc_info=True)
+    main()
