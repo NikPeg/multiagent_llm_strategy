@@ -189,3 +189,13 @@ async def get_all_active_countries():
         ) as cursor:
             countries = await cursor.fetchall()
             return countries
+
+async def get_user_id_by_country(country: str) -> Optional[int]:
+    async with aiosqlite.connect("chats.db") as db:
+        async with db.execute(
+                "SELECT user_id FROM user_states WHERE LOWER(country) = LOWER(?)",
+                (country,)
+        ) as cursor:
+            result = await cursor.fetchone()
+            return result[0] if result else None
+

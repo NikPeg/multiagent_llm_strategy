@@ -6,6 +6,10 @@ from concurrent.futures import ThreadPoolExecutor
 from model_handler import ModelHandler
 from database import *
 from utils import *
+from aiogram import types
+from aiogram.fsm.context import FSMContext
+from aiogram.fsm.state import State, StatesGroup
+from aiogram.fsm.storage.memory import MemoryStorage
 
 logging.basicConfig(
     level=logging.INFO,
@@ -39,7 +43,7 @@ if not BOT_TOKEN:
 
 model_handler = ModelHandler(MAX_NEW_TOKENS, SHORT_NEW_TOKENS)
 bot = Bot(token=BOT_TOKEN)
-dp = Dispatcher()
+dp = Dispatcher(storage=MemoryStorage())
 executor = ThreadPoolExecutor(max_workers=1)
 
 # Список аспектов страны: (кодовое_поле, человекочитаемое_название, вопрос)
@@ -213,6 +217,70 @@ async def admin_status(message: types.Message):
         "Некорректные параметры. Форматы:\n/admin_status [страна]\n/admin_status [аспект]\n/admin_status [страна] [аспект]\n\n"
         "Для помощи введите /admin_status help"
     )
+
+# Для FSM (машины состояний)
+class EditAspect(StatesGroup):
+    waiting_new_value = State()
+
+@dp.message(Command("edit"))
+async def admin_edit(message: types.Message, state: FSMContext):
+    if message.chat.id != ADMIN_CHAT_ID:
+        await answer_html(message, "У вас нет прав на эту команду.")
+        return
+
+    args = message.text.split(maxsplit=1)[1:]  # всё после команды
+    if not args:
+        await answer_html(message, "Формат: /edit <страна> <аспект>")
+        return
+    parts = args[0].split()
+    if len(parts) != 2:
+        await answer_html(message, "Формат: /edit <страна> <аспект>")
+        return
+
+    country_name = parts[0].strip()
+    aspect_code = parts[1].strip()
+    # --- Эта функция нужна в database.py ---
+    user_id = await get_user_id_by_country(country_name)
+    if not user_id:
+        await answer_html(message, f'Страна "{country_name}" не найдена.')
+        return
+
+    if aspect_code not in [a[0] for a in ASPECTS]:
+        await answer_html(message, f'Аспект "{aspect_code}" не найден.')
+        return
+
+    current_value = await get_user_aspect(user_id, aspect_code)
+    label = dict((a[0], a[1]) for a in ASPECTS)[aspect_code]
+    await answer_html(
+        message,
+        f"<b>{label}</b> для страны <b>{country_name}</b>:\n\n{stars_to_bold(current_value or '(нет данных)')}\n\n"
+        "Введите новый текст для этого поля, или /cancel для отмены."
+    )
+    # Запоминаем для FSM чей и какой аспект меняем
+    await state.set_state(EditAspect.waiting_new_value)
+    await state.update_data(user_id=user_id, aspect_code=aspect_code, country_name=country_name)
+
+@dp.message(EditAspect.waiting_new_value)
+async def process_new_value(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    if not data:
+        await answer_html(message, "Внутренняя ошибка: не указаны страна и аспект.")
+        await state.clear()
+        return
+
+    user_id = data["user_id"]
+    aspect_code = data["aspect_code"]
+    country_name = data["country_name"]
+    new_value = message.text.strip()
+
+    await set_user_aspect(user_id, aspect_code, new_value)
+    label = dict((a[0], a[1]) for a in ASPECTS)[aspect_code]
+
+    await answer_html(
+        message,
+        f"<b>{label}</b> для страны <b>{country_name}</b> успешно обновлён!"
+    )
+    await state.clear()
 
 # Только для обычных сообщений с текстом, не команд
 @dp.message(F.text & ~F.text.startswith('/'))
