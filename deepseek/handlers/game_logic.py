@@ -18,15 +18,14 @@ async def handle_country_name(message, user_id: int, user_text: str):
     )
 
 async def handle_country_desc(message, user_id: int, user_text: str):
-    country = user_text
+    country = await get_user_country(user_id)
     chat_id = message.chat.id
 
     await answer_html(message, "Создаю подробное начальное описание всех аспектов вашей страны, пожалуйста, подождите...")
-    typing_task = asyncio.create_task(keep_typing(message.bot, chat_id))
+    typing_task = asyncio.create_task(keep_typing(bot, chat_id))
 
     loop = asyncio.get_event_loop()
     user_name = message.from_user.username
-
     await send_html(
         message.bot,
         ADMIN_CHAT_ID,
@@ -53,7 +52,7 @@ async def handle_country_desc(message, user_id: int, user_text: str):
             f"<b>{label}</b> страны {country}: {aspect_value}{'' if aspect_value.endswith('.') else '.'}"
         )
         await send_html(
-            message.bot,
+            bot,
             ADMIN_CHAT_ID,
             f"<b>{label}</b> страны {country}: {aspect_value}{'' if aspect_value.endswith('.') else '.'}"
         )
