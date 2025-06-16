@@ -26,7 +26,6 @@ async def handle_country_desc(message, user_id: int, user_text: str):
     await answer_html(
         message,
         "Создаю подробное начальное описание всех аспектов вашей страны, пожалуйста, подождите...",
-        reply_markup=ASPECTS_KEYBOARD,
     )
     typing_task = asyncio.create_task(keep_typing(message.bot, chat_id))
 
@@ -38,7 +37,6 @@ async def handle_country_desc(message, user_id: int, user_text: str):
         f"📨 Регистрация новой страны от пользователя {user_id} {user_name}:\n\n"
         f"<b>Название страны:</b> {country}\n"
         f"<b>Описание страны:</b>\n{user_text.strip()}\n\n",
-        reply_markup=ASPECTS_KEYBOARD,
     )
     all_aspects = []
 
@@ -57,13 +55,11 @@ async def handle_country_desc(message, user_id: int, user_text: str):
         await answer_html(
             message,
             f"<b>{label}</b> страны {country}: {aspect_value}{'' if aspect_value.endswith('.') else '.'}",
-            reply_markup=ASPECTS_KEYBOARD,
         )
         await send_html(
             message.bot,
             ADMIN_CHAT_ID,
             f"<b>{label}</b> страны {country}: {aspect_value}{'' if aspect_value.endswith('.') else '.'}",
-            reply_markup=ASPECTS_KEYBOARD,
         )
         await set_user_aspect(user_id, code, aspect_value)
         all_aspects.append(aspect_value)
@@ -84,7 +80,6 @@ async def handle_country_desc(message, user_id: int, user_text: str):
         message.bot,
         ADMIN_CHAT_ID,
         f"<b>Описание</b> страны {country}: {description}{'' if description.endswith('.') else '.'}",
-        reply_markup=ASPECTS_KEYBOARD,
     )
     await set_user_country_desc(user_id, description)
 
@@ -127,7 +122,6 @@ async def handle_game_dialog(message, user_id: int, user_text: str):
             f"<code>{context}</code>\n\n"
             f"<b>Ответ модели:</b>\n"
             f"<code>{assistant_reply}</code>",
-            reply_markup=ASPECTS_KEYBOARD,
         )
     except Exception as e:
         await answer_html(message, f"Ошибка: {str(e)}", reply_markup=ASPECTS_KEYBOARD)

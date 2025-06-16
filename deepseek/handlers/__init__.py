@@ -3,7 +3,7 @@ from . import registration
 from . import admin
 from . import cancel
 from . import game
-from . import game_callbacks
+from . import game_aspects_buttons
 
 def register_handlers(dp):
     user_commands.register(dp)
@@ -11,4 +11,4 @@ def register_handlers(dp):
     admin.register(dp)
     cancel.register(dp)
     game.register(dp)
-    game_callbacks.register(dp)
+    game_aspects_buttons.register(dp)
