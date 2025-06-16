@@ -71,6 +71,7 @@ async def start(message: types.Message):
             "Вы управляете собственной страной: развиваете экономику, армию, дипломатию.\n\n"
             "📜 <b>Доступные команды:</b>\n"
             "/new — начать новый игровой диалог, сбросить текущий контекст\n"
+            "/reset_country — сбросить страну и зарегистрировать новую\n"
             "Для игры просто отправляйте сообщения с приказами, вопросами или решениями, как правитель своей страны!\n"
         )
         await answer_html(message, help_text)
@@ -304,6 +305,20 @@ async def process_new_value(message: types.Message, state: FSMContext):
         f"<b>{label}</b> для страны <b>{country_name}</b> успешно обновлён!"
     )
     await state.clear()
+
+@dp.message(Command("reset_country"))
+async def reset_country(message: types.Message):
+    user_id = message.from_user.id
+    await clear_history(user_id)
+    await clear_user_aspects(user_id)
+    await set_user_country(user_id, None)
+    await set_user_country_desc(user_id, None)
+    await set_aspect_index(user_id, None)
+    await answer_html(
+        message,
+        "⏳ Регистрация страны сброшена!\n\n"
+        "Введите <b>новое название вашей страны</b> для повторной регистрации:"
+    )
 
 # Только для обычных сообщений с текстом, не команд
 @dp.message(F.text & ~F.text.startswith('/'))
