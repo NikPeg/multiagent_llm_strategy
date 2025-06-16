@@ -52,7 +52,7 @@ async def handle_country_desc(message, user_id: int, user_text: str):
             f"<b>{label}</b> страны {country}: {aspect_value}{'' if aspect_value.endswith('.') else '.'}"
         )
         await send_html(
-            bot,
+            message.bot,
             ADMIN_CHAT_ID,
             f"<b>{label}</b> страны {country}: {aspect_value}{'' if aspect_value.endswith('.') else '.'}"
         )
