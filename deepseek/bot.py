@@ -80,7 +80,7 @@ async def new_chat(message: types.Message):
     await clear_history(user_id)
     await answer_html(message, "Контекст диалога сброшен!⚔️")
 
-@dp.message(Command("status"))
+@dp.message(Command("info"))
 async def admin_status(message: types.Message):
     if message.chat.id != ADMIN_CHAT_ID:
         await answer_html(message, "У вас нет прав на эту команду.")
@@ -259,6 +259,15 @@ async def admin_edit(message: types.Message, state: FSMContext):
     # Запоминаем для FSM чей и какой аспект меняем
     await state.set_state(EditAspect.waiting_new_value)
     await state.update_data(user_id=user_id, aspect_code=aspect_code, country_name=country_name)
+
+@dp.message(Command("cancel"))
+async def admin_edit_cancel(message: types.Message, state: FSMContext):
+    current_state = await state.get_state()
+    if current_state is not None:
+        await state.clear()
+        await answer_html(message, "Изменение отменено.")
+    else:
+        await answer_html(message, "Нет активных действий для отмены.")
 
 @dp.message(EditAspect.waiting_new_value)
 async def process_new_value(message: types.Message, state: FSMContext):
