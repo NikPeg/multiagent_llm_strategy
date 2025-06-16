@@ -19,7 +19,7 @@ def main():
     # Создаём бота и диспетчер с новым способом установки parse_mode
     bot = Bot(
         token=BOT_TOKEN,
-        default=DefaultBotProperties(parse_mode="HTML")
+        default=DefaultBotProperties()
     )
     dp = Dispatcher(storage=MemoryStorage())
 
