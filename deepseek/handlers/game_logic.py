@@ -8,7 +8,7 @@ from game import ASPECTS
 from model_handler import model_handler, executor
 # Импорт функций получения страны/описания по user_id, если требуется
 from database import get_user_country, get_user_country_desc
-from .keyboards import ASPECTS_KEYBOARD
+from ..keyboards import ASPECTS_KEYBOARD
 
 async def handle_country_name(message, user_id: int, user_text: str):
     await set_user_country(user_id, user_text)
