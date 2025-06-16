@@ -8,20 +8,26 @@ from game import ASPECTS
 from model_handler import model_handler, executor
 # Импорт функций получения страны/описания по user_id, если требуется
 from database import get_user_country, get_user_country_desc
+from keyboards import ASPECTS_KEYBOARD
 
 async def handle_country_name(message, user_id: int, user_text: str):
     await set_user_country(user_id, user_text)
     await answer_html(
         message,
         f"Название страны: <b>{user_text}</b>\n\n"
-        f"Теперь опиши кратко свою страну (география, особенности, народ, культура, стартовые условия):"
+        f"Теперь опиши кратко свою страну (география, особенности, народ, культура, стартовые условия):",
+        reply_markup=ASPECTS_KEYBOARD,
     )
 
 async def handle_country_desc(message, user_id: int, user_text: str):
     country = await get_user_country(user_id)
     chat_id = message.chat.id
 
-    await answer_html(message, "Создаю подробное начальное описание всех аспектов вашей страны, пожалуйста, подождите...")
+    await answer_html(
+        message,
+        "Создаю подробное начальное описание всех аспектов вашей страны, пожалуйста, подождите...",
+        reply_markup=ASPECTS_KEYBOARD,
+    )
     typing_task = asyncio.create_task(keep_typing(message.bot, chat_id))
 
     loop = asyncio.get_event_loop()
@@ -31,7 +37,8 @@ async def handle_country_desc(message, user_id: int, user_text: str):
         ADMIN_CHAT_ID,
         f"📨 Регистрация новой страны от пользователя {user_id} {user_name}:\n\n"
         f"<b>Название страны:</b> {country}\n"
-        f"<b>Описание страны:</b>\n{user_text.strip()}\n\n"
+        f"<b>Описание страны:</b>\n{user_text.strip()}\n\n",
+        reply_markup=ASPECTS_KEYBOARD,
     )
     all_aspects = []
 
@@ -49,12 +56,14 @@ async def handle_country_desc(message, user_id: int, user_text: str):
         )
         await answer_html(
             message,
-            f"<b>{label}</b> страны {country}: {aspect_value}{'' if aspect_value.endswith('.') else '.'}"
+            f"<b>{label}</b> страны {country}: {aspect_value}{'' if aspect_value.endswith('.') else '.'}",
+            reply_markup=ASPECTS_KEYBOARD,
         )
         await send_html(
             message.bot,
             ADMIN_CHAT_ID,
-            f"<b>{label}</b> страны {country}: {aspect_value}{'' if aspect_value.endswith('.') else '.'}"
+            f"<b>{label}</b> страны {country}: {aspect_value}{'' if aspect_value.endswith('.') else '.'}",
+            reply_markup=ASPECTS_KEYBOARD,
         )
         await set_user_aspect(user_id, code, aspect_value)
         all_aspects.append(aspect_value)
@@ -74,7 +83,8 @@ async def handle_country_desc(message, user_id: int, user_text: str):
     await send_html(
         message.bot,
         ADMIN_CHAT_ID,
-        f"<b>Описание</b> страны {country}: {description}{'' if description.endswith('.') else '.'}"
+        f"<b>Описание</b> страны {country}: {description}{'' if description.endswith('.') else '.'}",
+        reply_markup=ASPECTS_KEYBOARD,
     )
     await set_user_country_desc(user_id, description)
 
@@ -85,7 +95,8 @@ async def handle_country_desc(message, user_id: int, user_text: str):
         f"Игра начата! Действуй как правитель страны <b>{country}</b>.\n"
         f"Ты можешь отдавать приказы, объявлять войны, строить города или устанавливать отношения с другими странами.\n"
         f"В любой момент используй /new чтобы сбросить контекст."
-        "\n\nЧто будешь делать первым делом?"
+        "\n\nЧто будешь делать первым делом?",
+        reply_markup=ASPECTS_KEYBOARD,
     )
 
 async def handle_game_dialog(message, user_id: int, user_text: str):
@@ -106,7 +117,7 @@ async def handle_game_dialog(message, user_id: int, user_text: str):
         )
         typing_task.cancel()
         html_reply = stars_to_bold(assistant_reply)
-        await answer_html(message, html_reply)
+        await answer_html(message, html_reply, reply_markup=ASPECTS_KEYBOARD)
 
         await send_html(
             message.bot,
@@ -115,7 +126,8 @@ async def handle_game_dialog(message, user_id: int, user_text: str):
             f"<b>Промпт, переданный в модель:</b>\n"
             f"<code>{context}</code>\n\n"
             f"<b>Ответ модели:</b>\n"
-            f"<code>{assistant_reply}</code>"
+            f"<code>{assistant_reply}</code>",
+            reply_markup=ASPECTS_KEYBOARD,
         )
     except Exception as e:
-        await answer_html(message, f"Ошибка: {str(e)}")
+        await answer_html(message, f"Ошибка: {str(e)}", reply_markup=ASPECTS_KEYBOARD)
