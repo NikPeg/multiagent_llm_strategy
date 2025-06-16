@@ -1,5 +1,3 @@
-import asyncio
-import logging
 from dotenv import load_dotenv
 import os
 from aiogram import Bot, Dispatcher, types, F
@@ -84,29 +82,102 @@ async def admin_status(message: types.Message):
         await answer_html(message, "У вас нет прав на эту команду.")
         return
 
+    params = message.text.split(maxsplit=1)[1:]  # всё, что после команды
+    args = params[0].split() if params else []
+
     countries = await get_all_active_countries()
     if not countries:
         await answer_html(message, "Активных стран не обнаружено.")
         return
 
+    # Формируем словарь: country_name -> (user_id, country_name, country_desc, [aspects...])
+    countries_dict = {}
     for country_tuple in countries:
         user_id, country_name, country_desc, *aspect_values = country_tuple
-        # Если вдруг где-то не хватает полей — игнорируем
-        if len(aspect_values) != len(ASPECTS):
-            continue
-        await send_html(
-            bot,
-            ADMIN_CHAT_ID,
-            f"🗺 <b>Страна:</b> {country_name} (ID игрока: {user_id})\n"
-            f"<b>Описание:</b>\n{country_desc or '(Нет)'}"
-        )
-        for (code, label, _), value in zip(ASPECTS, aspect_values):
-            if value and value.strip():
-                await send_html(
-                    bot,
-                    ADMIN_CHAT_ID,
-                    f"<b>{label}:</b>\n{stars_to_bold(value)}"
-                )
+        countries_dict[country_name.strip().lower()] = {
+            "user_id": user_id,
+            "country_name": country_name,
+            "country_desc": country_desc,
+            "aspects": aspect_values
+        }
+
+    aspect_labels = {a[0]: a[1] for a in ASPECTS}
+    aspect_codes = set(aspect_labels.keys())
+
+    # Без параметров — как раньше, все страны и их аспекты
+    if not args:
+        for country_tuple in countries:
+            user_id, country_name, country_desc, *aspect_values = country_tuple
+            if len(aspect_values) != len(ASPECTS):
+                continue
+            await send_html(
+                bot,
+                ADMIN_CHAT_ID,
+                f"🗺 <b>Страна:</b> {country_name} (ID игрока: {user_id})\n"
+                f"<b>Описание:</b>\n{country_desc or '(Нет)'}"
+            )
+            for (code, label, _), value in zip(ASPECTS, aspect_values):
+                if value and value.strip():
+                    await send_html(
+                        bot,
+                        ADMIN_CHAT_ID,
+                        f"<b>{label}:</b>\n{stars_to_bold(value)}"
+                    )
+        return
+
+    # Один параметр: страна или аспект
+    if len(args) == 1:
+        arg = args[0].lower()
+        # Если совпадает аспект
+        if arg in aspect_codes:
+            idx = list(aspect_codes).index(arg)
+            # Собрать по всем странам этот аспект
+            reply = f"Все страны — аспект <b>{aspect_labels[arg]}</b>:\n"
+            for country_tuple in countries:
+                country_name = country_tuple[1]
+                aspect_value = country_tuple[3 + idx]
+                if aspect_value and aspect_value.strip():
+                    reply += f"\n<b>{country_name}</b>:\n{stars_to_bold(aspect_value)}"
+            await send_html(bot, ADMIN_CHAT_ID, reply)
+            return
+
+        # Если совпадает страна
+        if arg in countries_dict:
+            c = countries_dict[arg]
+            reply = f"🗺 <b>Страна:</b> {c['country_name']} (ID: {c['user_id']})\n"
+            reply += f"<b>Описание:</b>\n{c['country_desc'] or '(Нет)'}\n\n"
+            for (code, label, _), value in zip(ASPECTS, c["aspects"]):
+                if value and value.strip():
+                    reply += f"<b>{label}:</b>\n{stars_to_bold(value)}\n"
+            await send_html(bot, ADMIN_CHAT_ID, reply)
+            return
+
+        # Ничего не найдено
+        await answer_html(message, "Не найдено ни страны, ни аспекта с таким названием.")
+        return
+
+    # Два параметра: страна и аспект
+    if len(args) == 2:
+        country = args[0].lower()
+        aspect = args[1].lower()
+        if country not in countries_dict:
+            await answer_html(message, "Страна не найдена.")
+            return
+        if aspect not in aspect_codes:
+            await answer_html(message, "Аспект не найден.")
+            return
+        idx = list(aspect_codes).index(aspect)
+        value = countries_dict[country]["aspects"][idx]
+        label = aspect_labels[aspect]
+        if value and value.strip():
+            reply = f"<b>{label}</b> для страны <b>{countries_dict[country]['country_name']}</b>:\n{stars_to_bold(value)}"
+        else:
+            reply = f"Аспект <b>{label}</b> для страны <b>{countries_dict[country]['country_name']}</b> не найден."
+        await send_html(bot, ADMIN_CHAT_ID, reply)
+        return
+
+    # Слишком много параметров
+    await answer_html(message, "Некорректные параметры. Форматы:\n/admin_status [страна]\n/admin_status [аспект]\n/admin_status [страна] [аспект]")
 
 # Только для обычных сообщений с текстом, не команд
 @dp.message(F.text & ~F.text.startswith('/'))
