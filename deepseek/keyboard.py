@@ -5,10 +5,7 @@ def aspects_keyboard():
     # Кнопки с названиями аспектов (плюс описание страны)
     buttons = [KeyboardButton(text=label) for _, label, _ in ASPECTS]
     buttons.append(KeyboardButton(text="Описание страны"))
-    # Можно разбивать кнопки по рядам, если хотите несколько в строке:
-    keyboard = [buttons]  # всё в одну строку
-    # Или так для вертикального расположения:
-    # keyboard = [[b] for b in buttons]
+    keyboard = [buttons[:5], buttons[5:]]
     return ReplyKeyboardMarkup(
         keyboard=keyboard,
         resize_keyboard=True,
