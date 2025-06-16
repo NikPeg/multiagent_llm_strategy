@@ -2,6 +2,8 @@ import torch
 from transformers import AutoModelForCausalLM, AutoTokenizer
 from database import get_history, update_history
 from utils import *
+from config import MAX_NEW_TOKENS, SHORT_NEW_TOKENS
+from concurrent.futures import ThreadPoolExecutor
 
 logger = logging.getLogger(__name__)
 
@@ -97,3 +99,6 @@ class ModelHandler:
         except Exception as e:
             logger.error(f"Ошибка в generate_short_response: {str(e)}", exc_info=True)
             raise
+
+model_handler = ModelHandler(MAX_NEW_TOKENS, SHORT_NEW_TOKENS)
+executor = ThreadPoolExecutor(max_workers=1)
