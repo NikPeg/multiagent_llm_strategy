@@ -22,7 +22,7 @@ async def handle_country_desc(message, user_id: int, user_text: str):
     chat_id = message.chat.id
 
     await answer_html(message, "Создаю подробное начальное описание всех аспектов вашей страны, пожалуйста, подождите...")
-    typing_task = asyncio.create_task(keep_typing(bot, chat_id))
+    typing_task = asyncio.create_task(keep_typing(message.bot, chat_id))
 
     loop = asyncio.get_event_loop()
     user_name = message.from_user.username
