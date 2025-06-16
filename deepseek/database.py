@@ -199,3 +199,7 @@ async def get_user_id_by_country(country: str) -> Optional[int]:
             result = await cursor.fetchone()
             return result[0] if result else None
 
+async def user_exists(user_id: int) -> bool:
+    async with aiosqlite.connect("chats.db") as db:
+        async with db.execute("SELECT 1 FROM user_states WHERE user_id = ?", (user_id,)) as cursor:
+            return (await cursor.fetchone()) is not None
