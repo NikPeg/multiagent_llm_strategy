@@ -1,11 +1,13 @@
 import asyncio
-from config import ADMIN_CHAT_ID, GAME_PROMPT, RPG_PROMPT
+from config import ADMIN_CHAT_ID, GAME_PROMPT, RPG_PROMPT, HISTORY_LIMIT
 from database import (
     set_user_country, set_user_country_desc, set_user_aspect
 )
 from utils import answer_html, send_html, keep_typing, stars_to_bold
 from game import ASPECTS
 from model_handler import model_handler, executor
+# Импорт функций получения страны/описания по user_id, если требуется
+from database import get_user_country, get_user_country_desc
 
 async def handle_country_name(message, user_id: int, user_text: str):
     await set_user_country(user_id, user_text)
@@ -94,8 +96,6 @@ async def handle_game_dialog(message, user_id: int, user_text: str):
     try:
         await message.bot.send_chat_action(chat_id=chat_id, action="typing")
         typing_task = asyncio.create_task(keep_typing(message.bot, chat_id))
-        # Импорт функций получения страны/описания по user_id, если требуется
-        from database import get_user_country, get_user_country_desc, HISTORY_LIMIT
 
         country_name = await get_user_country(user_id)
         country_desc = await get_user_country_desc(user_id)
