@@ -12,6 +12,7 @@ from database import (
 from utils import answer_html, send_html, stars_to_bold
 from .fsm import EditAspect
 from game import ASPECTS
+from database import clear_history, clear_user_aspects, set_user_country, set_user_country_desc, set_aspect_index
 
 router = Router()
 
@@ -204,6 +205,33 @@ async def process_new_value(message: types.Message, state: FSMContext):
         f"<b>{label}</b> для страны <b>{country_name}</b> успешно обновлён!"
     )
     await state.clear()
+
+@router.message(Command("del_country"))
+async def admin_delete_country(message: types.Message):
+    if message.chat.id != ADMIN_CHAT_ID:
+        await answer_html(message, "У вас нет прав на эту команду.")
+        return
+
+    args = message.text.split(maxsplit=1)[1:]
+    if not args:
+        await answer_html(message, "Формат: /del_country <название_страны>")
+        return
+
+    country_name = args[0].strip()
+    user_id = await get_user_id_by_country(country_name)
+    if not user_id:
+        await answer_html(message, f'Страна "{country_name}" не найдена.')
+        return
+
+    # Импорт и удаление данных страны
+
+    await clear_history(user_id)
+    await clear_user_aspects(user_id)
+    await set_user_country(user_id, None)
+    await set_user_country_desc(user_id, None)
+    await set_aspect_index(user_id, None)
+
+    await answer_html(message, f'Страна "{country_name}" и все связанные данные удалены.')
 
 def register(dp):
     dp.include_router(router)
