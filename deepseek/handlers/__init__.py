@@ -10,5 +10,5 @@ def register_handlers(dp):
     registration.register(dp)
     admin.register(dp)
     cancel.register(dp)
-    game.register(dp)
     game_aspects_buttons.register(dp)
+    game.register(dp)
