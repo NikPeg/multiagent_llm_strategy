@@ -140,7 +140,7 @@ async def handle_game_dialog(message, user_id: int, user_text: str):
         # RPG_PROMPT + rag_context + история + пользовательский запрос
         # Модифицируем RPG_PROMPT если rag_context есть
         if rag_context:
-            prompt_with_rag = f"{RPG_PROMPT}\n\n{rag_context}\n\n"
+            prompt_with_rag = f"{RPG_PROMPT}\n\n{rag_context}\n"
         else:
             prompt_with_rag = RPG_PROMPT
 

@@ -89,7 +89,7 @@ async def get_rag_context(user_id: int, user_text: str) -> str:
     if scope == "self":
         value = await get_user_aspect(user_id, aspect)
         if value and value.strip():
-            return f"Справка: {aspect_label} вашей страны — {value.strip()}."
+            return f"Справка: {aspect_label} вашей страны — {value.strip()}"
     elif scope == "all":
         countries = await get_all_active_countries()
         lines = []
@@ -108,7 +108,7 @@ async def get_rag_context(user_id: int, user_text: str) -> str:
             return f"Данных о стране {country_name} не найдено."
         value = await get_user_aspect(other_user_id, aspect)
         if value and value.strip():
-            return f"Справка: {aspect_label} страны {country_name} — {value.strip()}."
-        return f"По стране {country_name} нет информации по аспекту '{aspect_label}'."
+            return f"Справка: {aspect_label} страны {country_name} — {value.strip()}"
+        return ""
 
     return ""
