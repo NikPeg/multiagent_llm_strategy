@@ -19,22 +19,13 @@ async def generate_event_for_country(country):
             user_id = await get_user_id_by_country(c)
             desc = await get_user_country_desc(user_id)
             descs.append(f"{c}: {desc or '(нет описания)'}")
-            aspect_texts = []
-            for code, label, _ in ASPECTS:
-                asp = await get_user_aspect(user_id, code)
-                if asp:
-                    aspect_texts.append(f"{label}: {asp}")
-            if aspect_texts:
-                aspects_data.append(f"{c}:\n" + "\n".join(aspect_texts))
         prompt = (
                 f"{GAME_PROMPT}\n"
                 "Владыки следующих стран и их государства:\n"
                 + "\n".join(descs) + "\n"
-                                     "Сводка по странам:\n"
-                + "\n".join(aspects_data) + "\n"
-                                            "Во времена те необычайное и судьбоносное событие обрушилось на все эти державы, смутив умы владык и народов. "
-                                            "Случившееся изменило течение древней истории, оставив глубокий след в летописях. "
-                                            "Краткое описание сего события:"
+                "Во времена те необычайное и судьбоносное событие обрушилось на все эти державы, смутив умы владык и народов. "
+                "Случившееся изменило течение древней истории, оставив глубокий след в летописях. "
+                "Краткое описание сего события:"
         )
     elif isinstance(country, str) and country.lower() == "все":
         # Получить имена всех стран и применить логику для всех
