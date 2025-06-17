@@ -34,6 +34,14 @@ async def init_db():
                 {" ,".join([f'"{a}" TEXT' for a in ASPECT_CODES])}
             )"""
         )
+        await db.execute(
+            """
+            CREATE TABLE IF NOT EXISTS country_synonyms (
+                country TEXT,
+                synonym TEXT UNIQUE
+            )
+            """
+        )
         await db.commit()
 
 # ==== История чатов ====
@@ -230,10 +238,13 @@ async def get_all_country_names():
 
 
 async def get_user_id_by_country(country: str) -> Optional[int]:
+    country_name = await get_country_by_synonym_or_name(country)
+    if not country_name:
+        return None
     async with aiosqlite.connect("chats.db") as db:
         async with db.execute(
                 "SELECT user_id FROM user_states WHERE LOWER(country) = LOWER(?)",
-                (country,)
+                (country_name,)
         ) as cursor:
             result = await cursor.fetchone()
             return result[0] if result else None
@@ -242,3 +253,40 @@ async def user_exists(user_id: int) -> bool:
     async with aiosqlite.connect("chats.db") as db:
         async with db.execute("SELECT 1 FROM user_states WHERE user_id = ?", (user_id,)) as cursor:
             return (await cursor.fetchone()) is not None
+
+async def add_country_synonym(country: str, synonym: str):
+    async with aiosqlite.connect("chats.db") as db:
+        await db.execute(
+            "INSERT OR IGNORE INTO country_synonyms (country, synonym) VALUES (?, ?)",
+            (country, synonym)
+        )
+        await db.commit()
+
+async def get_country_by_synonym_or_name(name: str) -> Optional[str]:
+    async with aiosqlite.connect("chats.db") as db:
+        # Сначала ищем синоним
+        async with db.execute(
+                "SELECT country FROM country_synonyms WHERE LOWER(synonym) = LOWER(?)",
+                (name,)
+        ) as cursor:
+            res = await cursor.fetchone()
+            if res:
+                return res[0]
+        # Если не найден, ищем среди официальных названий
+        async with db.execute(
+                "SELECT country FROM user_states WHERE LOWER(country) = LOWER(?)",
+                (name,)
+        ) as cursor:
+            res = await cursor.fetchone()
+            if res:
+                return res[0]
+        return None
+
+async def get_synonyms_for_country(country: str) -> List[str]:
+    async with aiosqlite.connect("chats.db") as db:
+        async with db.execute(
+                "SELECT synonym FROM country_synonyms WHERE LOWER(country) = LOWER(?)",
+                (country,)
+        ) as cursor:
+            synonyms = await cursor.fetchall()
+            return [row[0] for row in synonyms]
