@@ -10,6 +10,7 @@ from model_handler import model_handler, executor
 from database import get_user_country, get_user_country_desc
 from keyboard import ASPECTS_KEYBOARD
 from rag_retriever import get_rag_context
+from style_checker import contains_modern_words
 
 async def handle_country_name(message, user_id: int, user_text: str):
     await set_user_country(user_id, user_text)
@@ -22,6 +23,15 @@ async def handle_country_name(message, user_id: int, user_text: str):
 async def handle_country_desc(message, user_id: int, user_text: str):
     country = await get_user_country(user_id)
     chat_id = message.chat.id
+
+    # Проверка на современные слова
+    if contains_modern_words(user_text):
+        await answer_html(
+            message,
+            "❗️Описание содержит слова, не подходящие для эпохи древнего мира. "
+            "Пожалуйста, перепиши описание, избегая современных понятий (например, автомобили, интернет, доллары и т.п.)"
+        )
+        return
 
     await answer_html(
         message,
@@ -97,6 +107,16 @@ async def handle_country_desc(message, user_id: int, user_text: str):
 async def handle_game_dialog(message, user_id: int, user_text: str):
     chat_id = message.chat.id
     user_name = message.from_user.username
+
+    # Проверка на запрещённые современные слова
+    if contains_modern_words(user_text):
+        await answer_html(
+            message,
+            "❗️Ваше сообщение содержит слова и понятия, не подходящие для эпохи древнего мира. "
+            "Пожалуйста, пишите так, чтобы ваши приказы, вопросы и описания соответствовали антуражу древностей (без упоминаний современных технологий, денег, профессий и т.п.).",
+            reply_markup=ASPECTS_KEYBOARD,
+        )
+        return
 
     try:
         await message.bot.send_chat_action(chat_id=chat_id, action="typing")
