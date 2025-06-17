@@ -39,33 +39,33 @@ async def keep_typing(bot, chat_id):
     except Exception as e:
         logger.error(f"Ошибка в keep_typing: {str(e)}", exc_info=True)
 
-def clean_ai_response(text: str, drop='Шшвшв') -> str:
+def clean_ai_response(text: str) -> str:
     """
-    Очищает ответ от спец-тегов <think>...</think> (или &lt;think&gt;...&lt;/think&gt;),
-    а также по ключевым словам User: Player: Игрок: и двойному переводу строки (\n\n)
+    - Если есть <think>...</think> или &lt;think&gt;...&lt;/think&gt;, вернуть только то, что между ними.
+    - Если есть только <think> или &lt;think&gt;, текст после этого тега.
+    - Если только </think> или &lt;/think&gt;, текст до него.
+    - После этого обрезать по первым ключевым словам User:/Игрок:/Player:.
+    - Если ничего не найдено — вернуть исходный текст (или с минимальной чисткой).
     """
-    # Удалить блоки между (экранированными) <think> и </think> (многострочно!)
-    # Удаляет и с <think>...</think> и с &lt;think&gt;...&lt;/think&gt;
-    text = re.sub(r'(<think>.*?</think>|&lt;think&gt;.*?&lt;/think&gt;)', '', text, flags=re.DOTALL | re.IGNORECASE)
+    # Сначала обработаем оба варианта тегов
+    for open_tag, close_tag in [('&lt;think&gt;', '&lt;/think&gt;'), ('<think>', '</think>')]:
+        open_idx = text.find(open_tag)
+        close_idx = text.find(close_tag)
+        if open_idx != -1 and close_idx != -1 and open_idx < close_idx:
+            text = text[open_idx + len(open_tag):close_idx].strip()
+            break
+        if open_idx != -1:
+            text = text[open_idx + len(open_tag):].strip()
+            break
+        if close_idx != -1:
+            text = text[:close_idx].strip()
+            break
 
-    cuts = []
-
-    # Ключевые слова для отсечения
+    # Далее стандартная обрезка по спец-словам
     pattern = re.compile(r'(User:|Игрок:|Player:)', re.IGNORECASE)
     match = pattern.search(text)
     if match:
-        cuts.append(match.start())
-    # Двойной перенос строки как граница ответа
-    double_newline = text.find(drop)
-    if double_newline != -1:
-        cuts.append(double_newline)
-
-    # Если найдено хотя бы одно ключевое слово или перенос
-    cut_pos = None
-    if cuts:
-        cut_pos = min(cuts)
-    if cut_pos is not None:
-        text = text[:cut_pos].rstrip()
+        text = text[:match.start()].rstrip()
 
     return text.strip()
 
