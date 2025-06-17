@@ -63,9 +63,8 @@ async def info(message: types.Message):
                 "<b>/info</b> — просмотр стран и аспектов\n"
                 "<b>Использование:</b>\n"
                 "/info — все страны и все аспекты\n"
-                "/info <i>страна</i> — все аспекты по стране\n"
-                "/info <i>аспект</i> — этот аспект по всем странам\n"
-                "/info <i>страна</i> <i>аспект</i> — выбранный аспект страны\n\n"
+                "/info <аспект> — этот аспект/описание по всем странам\n"
+                "/info <аспект> <название страны> — выбранный аспект данной страны\n\n"
                 "<b>Доступные коды аспектов:</b>\n" +
                 "\n".join(f"<b>{code}</b>: {aspect_labels[code]}" for code in aspect_codes)
         )
@@ -95,11 +94,13 @@ async def info(message: types.Message):
                     )
         return
 
-    # /info <аспект>  или  /info <страна>
+    # /info <аспект>
     if len(args) == 1:
-        arg = args[0].lower()
-        # Все описания стран
-        if arg == "описание":
+        aspect = args[0].lower()
+        if aspect not in aspect_labels:
+            await answer_html(message, "Аспект не найден.")
+            return
+        if aspect == "описание":
             for country_tuple in countries:
                 country_name = country_tuple[1]
                 user_id = country_tuple[0]
@@ -110,43 +111,22 @@ async def info(message: types.Message):
                         f"<b>{country_name}</b> (ID: {user_id}):\n<b>Описание страны:</b>\n{desc}"
                     )
             return
-        if arg in aspect_labels and arg != "описание":
-            idx = aspect_codes.index(arg)
-            for country_tuple in countries:
-                country_name = country_tuple[1]
-                user_id = country_tuple[0]
-                aspect_value = country_tuple[3 + idx]
-                if aspect_value and aspect_value.strip():
-                    await send_html(
-                        message.bot, ADMIN_CHAT_ID,
-                        f"<b>{country_name}</b> (ID: {user_id}):\n<b>{aspect_labels[arg]}</b>:\n{stars_to_bold(aspect_value)}"
-                    )
-            return
-        if arg in countries_dict:
-            c = countries_dict[arg]
-            await send_html(
-                message.bot,
-                ADMIN_CHAT_ID,
-                f"🗺 <b>Страна:</b> {c['country_name']} (ID: {c['user_id']})"
-            )
-            await send_html(
-                message.bot,
-                ADMIN_CHAT_ID,
-                f"<b>Описание:</b>\n{c['country_desc'] or '(Нет)'}"
-            )
-            for (code, label, _), value in zip(ASPECTS, c["aspects"]):
-                if value and value.strip():
-                    await send_html(
-                        message.bot, ADMIN_CHAT_ID, f"<b>{label}:</b>\n{stars_to_bold(value)}"
-                    )
-            return
-        await answer_html(message, "Не найдено ни страны, ни аспекта с таким названием.")
+        idx = aspect_codes.index(aspect)
+        for country_tuple in countries:
+            country_name = country_tuple[1]
+            user_id = country_tuple[0]
+            aspect_value = country_tuple[3 + idx]
+            if aspect_value and aspect_value.strip():
+                await send_html(
+                    message.bot, ADMIN_CHAT_ID,
+                    f"<b>{country_name}</b> (ID: {user_id}):\n<b>{aspect_labels[aspect]}</b>:\n{stars_to_bold(aspect_value)}"
+                )
         return
 
-    # /info <страна> <аспект>
-    if len(args) == 2:
-        country = args[0].lower()
-        aspect = args[1].lower()
+    # /info <аспект> <название_страны>
+    if len(args) >= 2:
+        aspect = args[0].lower()
+        country = " ".join(args[1:]).strip().lower()
         if country not in countries_dict:
             await answer_html(message, "Страна не найдена.")
             return
@@ -187,7 +167,10 @@ async def info(message: types.Message):
 
     await answer_html(
         message,
-        "Некорректные параметры. Форматы:\n/info [страна]\n/info [аспект]\n/info [страна] [аспект]\n\n"
+        "Некорректные параметры. Форматы:\n"
+        "/info [аспект]\n"
+        "/info [аспект] [название страны]\n"
+        "/info\n\n"
         "Для помощи введите /info help"
     )
 
@@ -199,15 +182,15 @@ async def admin_edit(message: types.Message, state: FSMContext):
 
     args = message.text.split(maxsplit=1)[1:]
     if not args:
-        await answer_html(message, "Формат: /edit <страна> <аспект>")
+        await answer_html(message, "Формат: /edit <аспект> <название страны>")
         return
     parts = args[0].split()
-    if len(parts) != 2:
-        await answer_html(message, "Формат: /edit <страна> <аспект>")
+    if len(parts) < 2:
+        await answer_html(message, "Формат: /edit <аспект> <название страны>")
         return
 
-    country_name = parts[0].strip()
-    aspect_code = parts[1].strip()
+    aspect_code = parts[0].strip()
+    country_name = " ".join(parts[1:]).strip()
     user_id = await get_user_id_by_country(country_name)
     if not user_id:
         await answer_html(message, f'Страна "{country_name}" не найдена.')
@@ -302,22 +285,15 @@ async def admin_help(message: types.Message):
     await answer_html(
         message,
         "<b>Админ-команды:</b>\n\n"
-        "<b>/info</b> — информация по странам/аспектам\n"
-        "  /info — список всех стран и аспектов\n"
-        "  /info &lt;страна&gt; — все аспекты и описание страны\n"
-        "  /info &lt;аспект&gt; — один аспект для всех стран\n"
-        "  /info &lt;страна&gt; &lt;аспект&gt; — аспект определённой страны\n"
-        "  /info (описание работает как отдельный \"аспект\")\n\n"
-        "<b>/edit &lt;страна&gt; &lt;аспект/описание&gt;</b> — изменить значение любого аспекта или описание страны (через диалог)\n\n"
-        "<b>/del_country &lt;страна&gt;</b> — полностью удалить страну (история, описание и аспекты)\n\n"
-        "<b>/event &lt;страна&gt;</b> — сгенерировать ивент для страны\n\n"
-        "<b>/event &lt;все&gt;</b> — сгенерировать ивент для всех стран\n\n"
-        "<b>/send &lt;страна&gt;</b> — отправить сообщение в одну из стран\n\n"
-        "<b>/send &lt;все&gt;</b> — отправить сообщение во все страны\n\n"
-        "<b>/help</b> — эта справка\n"
-        "\n<b>Доступные аспекты:</b>\n"
-        + "\n".join(f"<b>{a[0]}</b>: {a[1]}" for a in ASPECTS) +
-        "\n<b>описание</b>: Описание страны"
+        "<b>/info [аспект] [страна]</b> — посмотреть аспекты (или описание) стран\n"
+        "<b>/edit [аспект] [страна]</b> — изменить аспект или описание страны\n"
+        "<b>/del_country [страна]</b> — удалить страну\n"
+        "<b>/event [страна|все]</b> — сгенерировать ивент для страны или всех\n"
+        "<b>/send [страна|все]</b> — отправить сообщение в страну или всем\n"
+        "<b>/help</b> — показать эту справку\n\n"
+        "<b>Доступные аспекты:</b>\n"
+        + ", ".join(f"<b>{a[0]}</b>" for a in ASPECTS) +
+        ", <b>описание</b>"
     )
 
 @router.message(Command("event"))
