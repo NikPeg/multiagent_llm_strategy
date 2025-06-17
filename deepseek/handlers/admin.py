@@ -6,7 +6,7 @@ from config import ADMIN_CHAT_ID
 from database import *
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from utils import answer_html, send_html, stars_to_bold
-from .fsm import EditAspect
+from .fsm import *
 from game import ASPECTS
 from event_generator import generate_event_for_country
 from .fsm import ConfirmEvent, AdminSendMessage
@@ -273,24 +273,6 @@ async def admin_delete_country(message: types.Message):
 
     await answer_html(message, f'Страна "{country_name}" и все связанные данные удалены.')
 
-@router.message(Command("help"))
-async def admin_help(message: types.Message):
-    if message.chat.id != ADMIN_CHAT_ID:
-        await answer_html(message, "У вас нет прав на эту команду.")
-        return
-    await answer_html(
-        message,
-        "<b>Админ-команды:</b>\n\n"
-        "<b>/info [аспект] [страна]</b> — посмотреть аспекты (или описание) стран\n"
-        "<b>/edit [аспект] [страна]</b> — изменить аспект или описание страны\n"
-        "<b>/del_country [страна]</b> — удалить страну\n"
-        "<b>/event [страна|все]</b> — сгенерировать ивент для страны или всех\n"
-        "<b>/send [страна|все]</b> — отправить сообщение в страну или всем\n"
-        "<b>/help</b> — показать эту справку\n\n"
-        "<b>Доступные аспекты:</b>\n"
-        + ", ".join(f"<b>{a[0]}</b>" for a in ASPECTS) +
-        ", <b>описание</b>"
-    )
 
 @router.message(Command("event"))
 async def admin_generate_event(message: types.Message, state: FSMContext):
@@ -438,6 +420,70 @@ async def admin_list_country_synonyms(message: types.Message):
 
     text = "<b>Страны и их синонимы:</b>\n" + "\n".join(lines)
     await answer_html(message, text)
+
+@router.message(Command("add_synonym"))
+async def admin_prepare_add_synonym(message: types.Message, state: FSMContext):
+    if message.chat.id != ADMIN_CHAT_ID:
+        await answer_html(message, "У вас нет прав на эту команду.")
+        return
+
+    args = message.text.split(maxsplit=1)[1:]
+    if not args:
+        await answer_html(message, "Формат: /add_synonym <название_страны>")
+        return
+
+    country_name = args[0].strip()
+    if len(args) > 1:
+        country_name = " ".join(args).strip()
+
+    main_country = await get_country_by_synonym_or_name(country_name)
+    if not main_country:
+        await answer_html(message, f'Страна "{country_name}" не найдена.')
+        return
+
+    await state.set_state(AddCountrySynonym.waiting_for_synonym)
+    await state.update_data(main_country=main_country)
+    await answer_html(message, f'Введите синоним для страны <b>{main_country}</b>:')
+
+@router.message(AddCountrySynonym.waiting_for_synonym)
+async def admin_add_synonym(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    if not data or 'main_country' not in data:
+        await answer_html(message, "Не выбрана страна. Начните с /add_synonym [страна].")
+        await state.clear()
+        return
+
+    synonym = message.text.strip()
+    if not synonym:
+        await answer_html(message, "Синоним не может быть пустым. Введите синоним или /cancel для отмены.")
+        return
+
+    main_country = data['main_country']
+    await add_country_synonym(main_country, synonym)
+    await answer_html(message, f'Синоним <b>{synonym}</b> добавлен для страны <b>{main_country}</b>.')
+    await state.clear()
+
+@router.message(Command("help"))
+async def admin_help(message: types.Message):
+    if message.chat.id != ADMIN_CHAT_ID:
+        await answer_html(message, "У вас нет прав на эту команду.")
+        return
+    await answer_html(
+        message,
+        "<b>Админ-команды:</b>\n\n"
+        "<b>/info [аспект] [страна]</b> — посмотреть аспекты (или описание) стран\n"
+        "<b>/edit [аспект] [страна]</b> — изменить аспект или описание страны\n"
+        "<b>/del_country [страна]</b> — удалить страну\n"
+        "<b>/event [страна|все]</b> — сгенерировать ивент для страны или всех\n"
+        "<b>/send [страна|все]</b> — отправить сообщение в страну или всем\n"
+        "<b>/countries</b> — вывести список всех стран и их синонимов\n"
+        "<b>/add_synonym [страна]</b> — добавить синоним для страны (бот спросит синоним)\n"
+        "<b>/help</b> — показать эту справку\n\n"
+        "<i>Во всех командах вместо названия страны можно использовать её синоним!</i>\n\n"
+        "<b>Доступные аспекты:</b>\n"
+        + ", ".join(f"<b>{a[0]}</b>" for a in ASPECTS) +
+        ", <b>описание</b>"
+    )
 
 def register(dp):
     dp.include_router(router)

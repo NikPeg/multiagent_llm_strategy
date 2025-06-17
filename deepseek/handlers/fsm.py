@@ -11,3 +11,6 @@ class ConfirmEvent(StatesGroup):
 
 class AdminSendMessage(StatesGroup):
     waiting_message = State()
+
+class AddCountrySynonym(StatesGroup):
+    waiting_for_synonym = State()
