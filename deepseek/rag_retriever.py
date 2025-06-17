@@ -1,6 +1,9 @@
 from game import ASPECTS
 from database import *
 from typing import Tuple
+import logging
+
+logger = logging.getLogger("detect_aspect_and_country")
 
 # Карта синонимов для аспектов
 ASPECT_SYNONYMS = {
@@ -41,56 +44,78 @@ async def detect_aspect_and_country(user_id: int, user_text: str) -> Tuple[str, 
     По умолчанию: аспект = "описание", страна = собственная.
     """
     ut = user_text.lower()
+    logger.info(f"detect_aspect_and_country: user_id={user_id}, user_text='{user_text}' (ut='{ut}')")
     aspect = "описание"
     all_country_names = await get_all_country_names()
+    logger.info(f"Все названия стран (основные): {all_country_names}")
     country_name = await get_user_country(user_id)
+    logger.info(f"Страна пользователя по умолчанию: {country_name}")
 
     # Найти аспект по ключевым словам
+    aspect_found = False
     for asp, synonyms in ASPECT_SYNONYMS.items():
         for word in synonyms:
             if word in ut:
                 aspect = asp
+                aspect_found = True
+                logger.info(f"Найден аспект '{aspect}' по синониму '{word}' в тексте '{user_text}'")
                 break
-        if aspect != "описание":
+        if aspect_found:
             break
+    if not aspect_found:
+        logger.info("Аспект не найден, используется 'описание'")
 
     country_variants = await get_all_country_synonyms_and_names()
-    # Проверить — есть ли в тексте имя или синоним другой страны
+    logger.info(f"country_variants (все варианты поиска): {country_variants}")
+
+    country_found = None
     for var, canonical in country_variants:
         if not var:
             continue
-        # Пробуем: полное совпадение, совпадение без последней буквы, совпадение без двух последних букв
+        # Пробуем: полное совпадение, совпадение без последней буквы, без двух последних букв
         lowers = [var, var[:-1], var[:-2]] if len(var) > 3 else [var]
         for form in lowers:
             if form and form in ut:
-                country_name = canonical
+                logger.info(
+                    f"В тексте '{ut}' найдено упоминание страны/синонима '{form}' "
+                    f"(оригинал: '{var}', каноническое: '{canonical}')"
+                )
+                country_found = canonical
                 break
-        if country_name == canonical:
+        if country_found:
             break
 
+    if country_found:
+        logger.info(f"Итоговая страна (поиск по тексту): {country_found}")
+        country_name = country_found
+    else:
+        logger.info("Страна не найдена в тексте, используется страна пользователя")
+
+    logger.info(f"Результат: aspect={aspect}, country_name={country_name}")
     return aspect, country_name
 
 async def get_rag_context(user_id: int, user_text: str) -> str:
-    """
-    Возвращает текстовое описание аспекта для вставки в промпт.
-    """
+    logger.info(f"get_rag_context: user_id={user_id}, user_text='{user_text}'")
     aspect, country = await detect_aspect_and_country(user_id, user_text)
+    logger.info(f"get_rag_context: detect_aspect_and_country вернул aspect={aspect}, country={country}")
 
     if aspect == "описание":
-        # Описание страны
         if not country:
+            logger.info("Страна не определена, возвращаем пустую строку")
             return ""
         desc = await get_user_country_desc(await get_user_id_by_country(country))
+        logger.info(f"Описание страны '{country}': {desc}")
         if desc and desc.strip():
             return f"Описание страны {country}: {desc.strip()}"
         return f"Описание страны {country} отсутствует."
 
-    # Если не "описание", то попробовать получить аспект из базы
     uid = await get_user_id_by_country(country)
     if not uid:
+        logger.info(f"Страна '{country}' не найдена в базе!")
         return f"Страна {country} не найдена."
     value = await get_user_aspect(uid, aspect)
     aspect_label = next((label for code, label, _ in ASPECTS if code == aspect), aspect.capitalize())
+    logger.info(f"Аспект '{aspect}' ('{aspect_label}') страны '{country}': {value}")
     if value and value.strip():
         return f"{aspect_label} страны {country}: {value.strip()}"
     return ""
