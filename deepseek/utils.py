@@ -41,32 +41,13 @@ async def keep_typing(bot, chat_id):
 
 def clean_ai_response(text: str) -> str:
     """
-    - Если есть <think>...</think> или &lt;think&gt;...&lt;/think&gt;, вернуть только то, что между ними.
-    - Если есть только <think> или &lt;think&gt;, текст после этого тега.
-    - Если только </think> или &lt;/think&gt;, текст до него.
-    - После этого обрезать по первым ключевым словам User:/Игрок:/Player:.
-    - Если ничего не найдено — вернуть исходный текст (или с минимальной чисткой).
+    Возвращает текст до первого &lt;/think&gt; (этот тег не включается),
+    либо весь текст, если такого тега нет.
     """
-    # Сначала обработаем оба варианта тегов
-    # for open_tag, close_tag in [('&lt;think&gt;', '&lt;/think&gt;'), ('<think>', '</think>')]:
-    #     open_idx = text.find(open_tag)
-    #     close_idx = text.find(close_tag)
-    #     if open_idx != -1 and close_idx != -1 and open_idx < close_idx:
-    #         text = text[open_idx + len(open_tag):close_idx].strip()
-    #         break
-    #     if open_idx != -1:
-    #         text = text[open_idx + len(open_tag):].strip()
-    #         break
-    #     if close_idx != -1:
-    #         text = text[:close_idx].strip()
-    #         break
-    #
-    # # Далее стандартная обрезка по спец-словам
-    # pattern = re.compile(r'(User:|Игрок:|Player:)', re.IGNORECASE)
-    # match = pattern.search(text)
-    # if match:
-    #     text = text[:match.start()].rstrip()
-
+    close_tag = '&lt;/think&gt;'
+    idx = text.find(close_tag)
+    if idx != -1:
+        return text[:idx].strip()
     return text.strip()
 
 def stars_to_bold(text):
