@@ -1,9 +1,10 @@
 from game import ASPECTS
 from database import (
     get_user_aspect,
-    get_all_active_countries,
+    get_user_country_desc,
     get_all_country_names,
-    get_user_id_by_country
+    get_user_id_by_country,
+    get_user_country,
 )
 
 # Карта синонимов для аспектов
@@ -39,76 +40,56 @@ ASPECT_SYNONYMS = {
 
 ALL_MARKERS = ["все", "другие", "сосед", "проч", "остальны", "других"]
 
-def detect_aspect_and_scope(user_text: str, all_countries: list[str]) -> tuple[str|None, str, str|None]:
+async def detect_aspect_and_country(user_id: int, user_text: str) -> Tuple[str, str]:
     """
-    Возвращает (aspect_code, scope, country_name)
-        scope: "self", "all", "other", "none"
-    country_name заполняется только при "other"
+    Определяет аспект и страну из текста пользователя.
+    По умолчанию: аспект = "описание", страна = собственная.
     """
     ut = user_text.lower()
-    aspect_detected = None
+    aspect = "описание"
+    all_country_names = await get_all_country_names()
+    country_name = await get_user_country(user_id)
 
     # Найти аспект по ключевым словам
-    for aspect, synonyms in ASPECT_SYNONYMS.items():
+    for asp, synonyms in ASPECT_SYNONYMS.items():
         for word in synonyms:
             if word in ut:
-                aspect_detected = aspect
+                aspect = asp
                 break
-        if aspect_detected:
+        if aspect != "описание":
             break
 
-    if not aspect_detected:
-        return None, "none", None
-
-    # Проверить если запрос ко всем странам
-    if any(marker in ut for marker in ALL_MARKERS):
-        return aspect_detected, "all", None
-
     # Проверить — есть ли в тексте имя другой страны
-    for c in all_countries:
-        if c is not None and c.strip():  # страховка от None
-            # Проверяем по вхождению фрагмента (можно доработать морфологически)
+    for c in all_country_names:
+        if c and c.strip():
             name_fragment = c.lower()[:-1]
-            # Чтобы не ловить на своё
-            if name_fragment in ut and ut.find(name_fragment) > 0:
-                return aspect_detected, "other", c
+            if name_fragment and name_fragment in ut:
+                country_name = c
+                break
 
-    return aspect_detected, "self", None
+    return aspect, country_name
 
 async def get_rag_context(user_id: int, user_text: str) -> str:
     """
-    Возвращает строку со справкой по аспекту для вставки в промпт LLM.
+    Возвращает текстовое описание аспекта для вставки в промпт.
     """
-    all_country_names = await get_all_country_names()
-    aspect, scope, country_name = detect_aspect_and_scope(user_text, all_country_names)
-    if not aspect:
-        return ""
+    aspect, country = await detect_aspect_and_country(user_id, user_text)
 
+    if aspect == "описание":
+        # Описание страны
+        if not country:
+            return ""
+        desc = await get_user_country_desc(await get_user_id_by_country(country))
+        if desc and desc.strip():
+            return f"Описание страны {country}: {desc.strip()}"
+        return f"Описание страны {country} отсутствует."
+
+    # Если не "описание", то попробовать получить аспект из базы
+    uid = await get_user_id_by_country(country)
+    if not uid:
+        return f"Страна {country} не найдена."
+    value = await get_user_aspect(uid, aspect)
     aspect_label = next((label for code, label, _ in ASPECTS if code == aspect), aspect.capitalize())
-
-    if scope == "self":
-        value = await get_user_aspect(user_id, aspect)
-        if value and value.strip():
-            return f"Справка: {aspect_label} вашей страны — {value.strip()}"
-    elif scope == "all":
-        countries = await get_all_active_countries()
-        lines = []
-        idx = [c for c, _, _ in ASPECTS].index(aspect)
-        for ct in countries:
-            uid, country, *_aspects = ct
-            val = _aspects[idx]
-            if val and val.strip():
-                lines.append(f"{country}: {val.strip()}")
-        if lines:
-            return f"Справка по аспекту '{aspect_label}' для всех стран:\n" + "\n".join(lines)
-    elif scope == "other" and country_name:
-        # Получить user_id страны и аспект
-        other_user_id = await get_user_id_by_country(country_name)
-        if not other_user_id:
-            return f"Данных о стране {country_name} не найдено."
-        value = await get_user_aspect(other_user_id, aspect)
-        if value and value.strip():
-            return f"Справка: {aspect_label} страны {country_name} — {value.strip()}"
-        return ""
-
+    if value and value.strip():
+        return f"{aspect_label} страны {country}: {value.strip()}"
     return ""

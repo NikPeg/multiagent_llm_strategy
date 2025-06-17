@@ -142,7 +142,7 @@ async def handle_game_dialog(message, user_id: int, user_text: str):
         if rag_context:
             prompt_with_rag = f"{RPG_PROMPT}\n\n{rag_context}\n"
         else:
-            prompt_with_rag = RPG_PROMPT
+            prompt_with_rag = RPG_PROMPT + "\n\n"
 
         # Передадим rag-расширенный prompt в LLM
         assistant_reply, context = await asyncio.get_event_loop().run_in_executor(
