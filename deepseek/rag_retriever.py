@@ -36,7 +36,7 @@ ASPECT_SYNONYMS = {
     ],
 }
 
-ALL_MARKERS = ["все", "другие", "сосед", "проч", "остальны", "других"]
+ALL_MARKERS = ["все", "други", "сосед", "проч", "остальны", "существующ"]
 
 async def detect_aspect_and_country(user_id: int, user_text: str) -> Tuple[str, str]:
     """
