@@ -39,14 +39,15 @@ async def keep_typing(bot, chat_id):
     except Exception as e:
         logger.error(f"Ошибка в keep_typing: {str(e)}", exc_info=True)
 
-def clean_ai_response(text: str, drop='\n\n') -> str:
+def clean_ai_response(text: str, drop='Шшвшв') -> str:
     """
-    Очищает ответ от спец-тегов и по ключевым словам User: Player: Игрок: и двойному переводу строки (\n\n)
+    Очищает ответ от спец-тегов <think>...</think> (или &lt;think&gt;...&lt;/think&gt;),
+    а также по ключевым словам User: Player: Игрок: и двойному переводу строки (\n\n)
     """
-    # Удаляем все </think> и &lt;/think&gt;
-    text = text.replace("</think>", "").replace("&lt;/think&gt;", "")
+    # Удалить блоки между (экранированными) <think> и </think> (многострочно!)
+    # Удаляет и с <think>...</think> и с &lt;think&gt;...&lt;/think&gt;
+    text = re.sub(r'(<think>.*?</think>|&lt;think&gt;.*?&lt;/think&gt;)', '', text, flags=re.DOTALL | re.IGNORECASE)
 
-    # Поиск позиций ключевых слов
     cuts = []
 
     # Ключевые слова для отсечения
@@ -63,7 +64,8 @@ def clean_ai_response(text: str, drop='\n\n') -> str:
     cut_pos = None
     if cuts:
         cut_pos = min(cuts)
-    text = text[:cut_pos].rstrip()
+    if cut_pos is not None:
+        text = text[:cut_pos].rstrip()
 
     return text.strip()
 
