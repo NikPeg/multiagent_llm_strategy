@@ -5,3 +5,6 @@ class ResetCountry(StatesGroup):
 
 class EditAspect(StatesGroup):
     waiting_new_value = State()
+
+class ConfirmEvent(StatesGroup):
+    waiting_approve = State()

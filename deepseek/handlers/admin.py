@@ -20,6 +20,7 @@ from utils import answer_html, send_html, stars_to_bold
 from .fsm import EditAspect
 from game import ASPECTS
 from event_generator import generate_event_for_country
+from .fsm import ConfirmEvent
 
 router = Router()
 
@@ -313,25 +314,74 @@ async def admin_help(message: types.Message):
     )
 
 @router.message(Command("ivent"))
-async def admin_generate_event(message: types.Message):
+async def admin_generate_event(message: types.Message, state: FSMContext):
     if message.chat.id != ADMIN_CHAT_ID:
         await answer_html(message, "У вас нет прав на эту команду.")
         return
 
     args = message.text.split(maxsplit=1)[1:]
     if not args:
-        await answer_html(message, "Формат: /ivent <название_страны>")
+        await answer_html(message, "Формат: /ivent <название_страны> или /ivent все")
         return
 
     country_name = args[0].strip()
     await answer_html(message, f"⏳ Генерация ивента для {country_name}...")
 
-    event_text = await generate_event_for_country(country_name)
+    # Сгенерировать для одной страны или для всех
+    if country_name.lower() == "все":
+        event_text = await generate_event_for_country("все")
+    else:
+        event_text = await generate_event_for_country(country_name)
 
+    # Сохраняем ивент и страну в FSM для подтверждения
+    await state.set_state(ConfirmEvent.waiting_approve)
+    await state.update_data(event_text=event_text, country_name=country_name)
+
+    kb = ReplyKeyboardMarkup(
+        keyboard=[[KeyboardButton(text="Да")], [KeyboardButton(text="Нет")]],
+        resize_keyboard=True,
+        one_time_keyboard=True
+    )
     await answer_html(
         message,
-        f"<b>Событие для страны {country_name}:</b>\n\n{event_text}"
+        f"<b>Событие для страны {country_name}:</b>\n\n{event_text}\n\nПодходит ли это событие? (Да/Нет)",
+        reply_markup=kb
     )
+
+@router.message(ConfirmEvent.waiting_approve)
+async def confirm_event_send(message: types.Message, state: FSMContext):
+    text = message.text.strip().lower()
+    data = await state.get_data()
+    event_text = data.get("event_text")
+    country_name = data.get("country_name")
+    await state.clear()
+
+    if text not in ("да", "yes"):
+        await answer_html(message, "Событие не отправлено.", reply_markup=None)
+        return
+
+    # Если "все" — отправить всем странам
+    if country_name.lower() == "все":
+        countries = await get_all_active_countries()
+        for row in countries:
+            user_id = row[0]
+            try:
+                await message.bot.send_message(user_id, f"⚡️ <b>В вашей стране случилось новое событие:</b>\n\n{event_text}", parse_mode="HTML")
+            except Exception as e:
+                continue
+        await answer_html(message, "Событие отправлено всем странам!", reply_markup=None)
+        return
+
+    # Для одной страны
+    user_id = await get_user_id_by_country(country_name)
+    if not user_id:
+        await answer_html(message, f'Страна "{country_name}" не найдена.', reply_markup=None)
+        return
+    try:
+        await message.bot.send_message(user_id, f"⚡️ <b>В вашей стране случилось новое событие:</b>\n\n{event_text}", parse_mode="HTML")
+        await answer_html(message, "Событие отправлено игроку.", reply_markup=None)
+    except Exception as e:
+        await answer_html(message, "Ошибка при отправке события игроку.", reply_markup=None)
 
 def register(dp):
     dp.include_router(router)
