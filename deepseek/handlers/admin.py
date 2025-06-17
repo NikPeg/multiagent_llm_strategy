@@ -310,13 +310,15 @@ async def admin_help(message: types.Message):
         "  /info (описание работает как отдельный \"аспект\")\n\n"
         "<b>/edit &lt;страна&gt; &lt;аспект/описание&gt;</b> — изменить значение любого аспекта или описание страны (через диалог)\n\n"
         "<b>/del_country &lt;страна&gt;</b> — полностью удалить страну (история, описание и аспекты)\n\n"
+        "<b>/event &lt;страна&gt;</b> — сгенерировать ивент для страны\n\n"
+        "<b>/event &lt;все&gt;</b> — сгенерировать ивент для всех стран\n\n"
         "<b>/help</b> — эта справка\n"
         "\n<b>Доступные аспекты:</b>\n"
         + "\n".join(f"<b>{a[0]}</b>: {a[1]}" for a in ASPECTS) +
         "\n<b>описание</b>: Описание страны"
     )
 
-@router.message(Command("ivent"))
+@router.message(Command("event"))
 async def admin_generate_event(message: types.Message, state: FSMContext):
     if message.chat.id != ADMIN_CHAT_ID:
         await answer_html(message, "У вас нет прав на эту команду.")
@@ -324,7 +326,7 @@ async def admin_generate_event(message: types.Message, state: FSMContext):
 
     args = message.text.split(maxsplit=1)[1:]
     if not args:
-        await answer_html(message, "Формат: /ivent <название_страны> или /ivent все")
+        await answer_html(message, "Формат: /event <название_страны> или /event все")
         return
 
     country_name = args[0].strip()
