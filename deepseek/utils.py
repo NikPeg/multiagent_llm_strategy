@@ -64,14 +64,29 @@ async def keep_typing(bot, chat_id):
 
 def clean_ai_response(text: str) -> str:
     """
-    Возвращает текст до первого &lt;/think&gt; (этот тег не включается),
-    либо весь текст, если такого тега нет.
+    1. Обрезает по первому &lt;/think&gt; (этот тег не включается), либо весь текст, если такого тега нет.
+    2. После этого ищет User:/Игрок:/Player:, обрезает до этого ключевого слова (результат — с первого такого слова и до конца).
+    3. Если результат пустой — возвращает исходный текст.
     """
+    base = text
+    # 1. Обрезать по &lt;/think&gt;
     close_tag = '&lt;/think&gt;'
-    idx = text.find(close_tag)
+    idx = base.find(close_tag)
     if idx != -1:
-        return text[:idx].strip()
-    return text.strip()
+        base = base[:idx].strip()
+    else:
+        base = base.strip()
+
+    # 2. Поиск User:/Игрок:/Player:
+    pattern = re.compile(r'(User:|Игрок:|Player:)', re.IGNORECASE)
+    match = pattern.search(base)
+    if match:
+        base = base[match.start():].strip()
+
+    # 3. Если пусто — вернуть исходник без обработки
+    if not base:
+        return text
+    return base
 
 def stars_to_bold(text):
     # Заменяем все **text** на <b>text</b>
