@@ -4,27 +4,50 @@ import asyncio
 
 logger = logging.getLogger(__name__)
 
+TELEGRAM_MAX_LENGTH = 4096
+
+def split_long_message(text: str, max_length: int = TELEGRAM_MAX_LENGTH):
+    """
+    Разбивает длинный текст на части не длиннее max_length символов.
+    Ставит разбиение по абзацам, если возможно.
+    """
+    parts = []
+    while len(text) > max_length:
+        # Ищем ближайший конец абзаца до лимита
+        split_idx = text.rfind('\n', 0, max_length)
+        if split_idx == -1 or split_idx < max_length * 0.5:
+            # Если абзаца не нашли, рвём в лоб
+            split_idx = max_length
+        parts.append(text[:split_idx])
+        text = text[split_idx:].lstrip('\n')
+    parts.append(text)
+    return parts
+
 async def answer_html(message, text: str, **kwargs):
     """
     Безопасная отправка сообщения с parse_mode="HTML".
     Если возникает ошибка (например, некорректные теги), повторно отправляет текст без форматирования.
+    Разбивает на несколько сообщений, если текст слишком длинный.
     """
-    try:
-        await message.answer(text, parse_mode="HTML", **kwargs)
-    except Exception as e:
-        logger.warning(f"Не удалось отправить сообщение в HTML: {str(e)}. Пробуем отправить без форматирования.")
-        await message.answer(text, **kwargs)
+    for part in split_long_message(text):
+        try:
+            await message.answer(part, parse_mode="HTML", **kwargs)
+        except Exception as e:
+            logger.warning(f"Не удалось отправить сообщение в HTML: {str(e)}. Пробуем отправить без форматирования.")
+            await message.answer(part, **kwargs)
 
 async def send_html(bot, chat_id, text: str, **kwargs):
     """
     Безопасная отправка сообщения в чат (канал, группу или user) с parse_mode="HTML".
     Если отправка в HTML не удалась, повторяет без форматирования.
+    Разбивает на несколько сообщений, если текст слишком длинный.
     """
-    try:
-        await bot.send_message(chat_id, text, parse_mode="HTML", **kwargs)
-    except Exception as e:
-        logger.warning(f"Не удалось отправить сообщение в HTML (bot.send_message): {str(e)}. Пробуем без форматирования.")
-        await bot.send_message(chat_id, text, **kwargs)
+    for part in split_long_message(text):
+        try:
+            await bot.send_message(chat_id, part, parse_mode="HTML", **kwargs)
+        except Exception as e:
+            logger.warning(f"Не удалось отправить сообщение в HTML (bot.send_message): {str(e)}. Пробуем без форматирования.")
+            await bot.send_message(chat_id, part, **kwargs)
 
 async def keep_typing(bot, chat_id):
     """

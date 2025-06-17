@@ -166,4 +166,8 @@ async def handle_game_dialog(message, user_id: int, user_text: str):
             f"<code>{assistant_reply}</code>",
         )
     except Exception as e:
-        await answer_html(message, f"Ошибка: {str(e)}", reply_markup=ASPECTS_KEYBOARD)
+        await send_html(
+            message.bot,
+            ADMIN_CHAT_ID,
+            f"Ошибка: {str(e)}"
+        )
