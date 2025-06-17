@@ -8,3 +8,6 @@ class EditAspect(StatesGroup):
 
 class ConfirmEvent(StatesGroup):
     waiting_approve = State()
+
+class AdminSendMessage(StatesGroup):
+    waiting_message = State()

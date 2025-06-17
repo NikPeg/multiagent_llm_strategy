@@ -23,7 +23,7 @@ from utils import answer_html, send_html, stars_to_bold
 from .fsm import EditAspect
 from game import ASPECTS
 from event_generator import generate_event_for_country
-from .fsm import ConfirmEvent
+from .fsm import ConfirmEvent, AdminSendMessage
 
 router = Router()
 
@@ -389,6 +389,53 @@ async def confirm_event_send(message: types.Message, state: FSMContext):
         await answer_html(message, "Событие отправлено игроку.", reply_markup=None)
     except Exception as e:
         await answer_html(message, "Ошибка при отправке события игроку.", reply_markup=None)
+
+@router.message(Command("send"))
+async def admin_prepare_send_message(message: types.Message, state: FSMContext):
+    if message.chat.id != ADMIN_CHAT_ID:
+        await answer_html(message, "У вас нет прав на эту команду.")
+        return
+
+    args = message.text.split(maxsplit=1)[1:]
+    if not args:
+        await answer_html(message, "Формат: /send <название_страны> или /send все")
+        return
+
+    target = args[0].strip()
+    await state.set_state(AdminSendMessage.waiting_message)
+    await state.update_data(target=target)
+
+    await answer_html(message, f"Введите текст сообщения, которое нужно отправить {'всем странам' if target.lower() == 'все' else f'стране {target}'}:")
+
+@router.message(AdminSendMessage.waiting_message)
+async def admin_do_send_message(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    target = data.get("target")
+    text = message.text.strip()
+    await state.clear()
+
+    if target.lower() == "все":
+        countries = await get_all_active_countries()
+        success = 0
+        for row in countries:
+            user_id = row[0]
+            try:
+                await message.bot.send_message(user_id, text, parse_mode="HTML")
+                success += 1
+            except Exception:
+                continue
+        await answer_html(message, f"Сообщение отправлено всем {success} странам!")
+        return
+
+    user_id = await get_user_id_by_country(target)
+    if not user_id:
+        await answer_html(message, f'Страна "{target}" не найдена.')
+        return
+    try:
+        await message.bot.send_message(user_id, text, parse_mode="HTML")
+        await answer_html(message, "Сообщение отправлено стране.")
+    except Exception:
+        await answer_html(message, "Ошибка при отправке сообщения игроку.")
 
 def register(dp):
     dp.include_router(router)
