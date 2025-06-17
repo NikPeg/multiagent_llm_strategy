@@ -64,26 +64,30 @@ async def keep_typing(bot, chat_id):
 
 def clean_ai_response(text: str) -> str:
     """
-    1. Вырезает всё ДО первого <think> или &lt;think&gt; (включая сам тег).
-    2. Затем ищет "Игрок:" и оставляет весь текст, начиная с этого слова.
-    3. Если в конце пусто, возвращает исходный text.
+    Возвращает текст между первым <think> или &lt;think&gt; (исключая тег)
+    и первым 'Игрок:' (не включая саму метку).
+    Если что-то осталось — возвращает это (strip).
+    Если ничего не найдено — возвращает исходный текст.
     """
-    for open_tag in ('&lt;think&gt;', '<think>'):
-        pos = text.find(open_tag)
-        if pos != -1:
-            text = text[pos + len(open_tag):]
+    for open_tag in ('&lt;think&gt;', '<think>', '&lt;/think&gt;', '</think>'):
+        open_idx = text.find(open_tag)
+        if open_idx != -1:
+            start = open_idx + len(open_tag)
             break
+    else:
+        return text.strip()  # нет open_tag — исходник
 
-    # Теперь ищем "Игрок:"
+    # ищем "Игрок:" после открывающего тега
+    remaining = text[start:]
     key = "Игрок:"
-    idx = text.find(key)
-    if idx != -1:
-        text = text[idx:]
+    close_idx = remaining.find(key)
+    if close_idx != -1:
+        result = remaining[:close_idx].strip()
+    else:
+        result = remaining.strip()
+    # Если результат не пустой — вернуть его, иначе вернуть исходник
+    return result if result else text.strip()
 
-    text = text.strip()
-    if not text:
-        return text
-    return text
 
 def stars_to_bold(text):
     # Заменяем все **text** на <b>text</b>
