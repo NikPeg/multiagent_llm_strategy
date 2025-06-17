@@ -304,7 +304,7 @@
     \clearpage
     \phantomsection
     \section*{Реферат} % TODO: "Реферат" или "Аннотация"?
-    \addcontentsline{toc}{section}{Реферат}
+%     \addcontentsline{toc}{section}{Реферат}
     \input{#1}
 
     \@abstractTotalCountsRu
@@ -314,7 +314,7 @@
     \clearpage
     \phantomsection
     \section*{Abstract}
-    \addcontentsline{toc}{section}{Abstract}
+%     \addcontentsline{toc}{section}{Abstract}
     \input{#2}
 
     \@abstractTotalCountsEn
