@@ -48,24 +48,24 @@ def clean_ai_response(text: str) -> str:
     - Если ничего не найдено — вернуть исходный текст (или с минимальной чисткой).
     """
     # Сначала обработаем оба варианта тегов
-    for open_tag, close_tag in [('&lt;think&gt;', '&lt;/think&gt;'), ('<think>', '</think>')]:
-        open_idx = text.find(open_tag)
-        close_idx = text.find(close_tag)
-        if open_idx != -1 and close_idx != -1 and open_idx < close_idx:
-            text = text[open_idx + len(open_tag):close_idx].strip()
-            break
-        if open_idx != -1:
-            text = text[open_idx + len(open_tag):].strip()
-            break
-        if close_idx != -1:
-            text = text[:close_idx].strip()
-            break
-
-    # Далее стандартная обрезка по спец-словам
-    pattern = re.compile(r'(User:|Игрок:|Player:)', re.IGNORECASE)
-    match = pattern.search(text)
-    if match:
-        text = text[:match.start()].rstrip()
+    # for open_tag, close_tag in [('&lt;think&gt;', '&lt;/think&gt;'), ('<think>', '</think>')]:
+    #     open_idx = text.find(open_tag)
+    #     close_idx = text.find(close_tag)
+    #     if open_idx != -1 and close_idx != -1 and open_idx < close_idx:
+    #         text = text[open_idx + len(open_tag):close_idx].strip()
+    #         break
+    #     if open_idx != -1:
+    #         text = text[open_idx + len(open_tag):].strip()
+    #         break
+    #     if close_idx != -1:
+    #         text = text[:close_idx].strip()
+    #         break
+    #
+    # # Далее стандартная обрезка по спец-словам
+    # pattern = re.compile(r'(User:|Игрок:|Player:)', re.IGNORECASE)
+    # match = pattern.search(text)
+    # if match:
+    #     text = text[:match.start()].rstrip()
 
     return text.strip()
 
