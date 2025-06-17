@@ -313,3 +313,22 @@ async def get_all_countries_and_synonyms():
                 # Иногда могут быть синонимы для неактивных стран
                 country_to_synonyms[country] = [synonym]
         return country_to_synonyms
+
+async def get_all_country_synonyms_and_names():
+    """
+    Возвращает список кортежей (вариант_поиска, canonical_country_name),
+    где вариант_поиска — это основное имя страны и все её синонимы (в lowercase, strip).
+    """
+    async with aiosqlite.connect("chats.db") as db:
+        # Основные имена стран
+        async with db.execute("SELECT country FROM user_states WHERE country IS NOT NULL") as cursor:
+            mains = [row[0].strip() for row in await cursor.fetchall()]
+        # Синонимы
+        async with db.execute("SELECT synonym, country FROM country_synonyms") as cursor:
+            synonyms = [(row[0].strip(), row[1].strip()) for row in await cursor.fetchall()]
+        result = []
+        for main in mains:
+            result.append((main.lower(), main))  # основное имя
+        for syn, main in synonyms:
+            result.append((syn.lower(), main))   # синоним
+        return result

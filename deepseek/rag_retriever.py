@@ -1,11 +1,5 @@
 from game import ASPECTS
-from database import (
-    get_user_aspect,
-    get_user_country_desc,
-    get_all_country_names,
-    get_user_id_by_country,
-    get_user_country,
-)
+from database import *
 from typing import Tuple
 
 # Карта синонимов для аспектов
@@ -60,13 +54,19 @@ async def detect_aspect_and_country(user_id: int, user_text: str) -> Tuple[str, 
         if aspect != "описание":
             break
 
-    # Проверить — есть ли в тексте имя другой страны
-    for c in all_country_names:
-        if c and c.strip():
-            name_fragment = c.lower()[:-1]
-            if name_fragment and name_fragment in ut:
-                country_name = c
+    country_variants = await get_all_country_synonyms_and_names()
+    # Проверить — есть ли в тексте имя или синоним другой страны
+    for var, canonical in country_variants:
+        if not var:
+            continue
+        # Пробуем: полное совпадение, совпадение без последней буквы, совпадение без двух последних букв
+        lowers = [var, var[:-1], var[:-2]] if len(var) > 3 else [var]
+        for form in lowers:
+            if form and form in ut:
+                country_name = canonical
                 break
+        if country_name == canonical:
+            break
 
     return aspect, country_name
 
