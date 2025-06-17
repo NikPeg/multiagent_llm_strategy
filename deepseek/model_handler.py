@@ -47,7 +47,7 @@ class ModelHandler:
             context_prompts = [rpg_prompt]
             if country_name and country_desc:
                 context_prompts.append(
-                    f'Игрок управляет страной "{country_name}". Описание страны: {country_desc}'
+                    f'Игрок управляет страной {country_name}\nОписание страны: {country_desc}\n'
                 )
             context = '\n'.join(context_prompts + history + [f"Игрок: {message_text}"]) + "\nАссистент:"
 
