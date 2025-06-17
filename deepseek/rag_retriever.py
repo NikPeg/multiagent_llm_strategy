@@ -86,12 +86,20 @@ async def detect_aspect_and_country(user_id: int, user_text: str) -> Tuple[str, 
             break
 
     if country_found:
-        logger.info(f"Итоговая страна (поиск по тексту): {country_found}")
+        logger.debug(f"Итоговая страна (поиск по тексту): {country_found}")
         country_name = country_found
     else:
-        logger.info("Страна не найдена в тексте, используется страна пользователя")
+        all_marker_found = False
+        for marker in ALL_MARKERS:
+            if marker in ut:
+                logger.debug(f"В тексте найден маркер '{marker}' из ALL_MARKERS, возвращаем 'все' страны")
+                country_name = "все"
+                all_marker_found = True
+                break
+        if not all_marker_found:
+            logger.debug("Страна не найдена в тексте и не найден маркер, используется страна пользователя")
 
-    logger.info(f"Результат: aspect={aspect}, country_name={country_name}")
+    logger.debug(f"Результат: aspect={aspect}, country_name={country_name}")
     return aspect, country_name
 
 async def get_rag_context(user_id: int, user_text: str) -> str:
@@ -99,6 +107,32 @@ async def get_rag_context(user_id: int, user_text: str) -> str:
     aspect, country = await detect_aspect_and_country(user_id, user_text)
     logger.info(f"get_rag_context: detect_aspect_and_country вернул aspect={aspect}, country={country}")
 
+    if country == "все":
+        if aspect == "описание":
+            # Получить описания всех стран
+            descs = await get_all_user_country_descs()
+            logger.info(f"Все описания стран: {descs}")
+            lines = []
+            for cname, desc in descs.items():
+                if desc and desc.strip():
+                    lines.append(f"{cname}: {desc.strip()}")
+                else:
+                    lines.append(f"{cname}: (нет описания)")
+            return "Описание всех стран:\n" + "\n".join(lines)
+
+        # Получить значения выбранного аспекта для всех стран
+        values = await get_all_user_aspect_values(aspect)
+        aspect_label = next((label for code, label, _ in ASPECTS if code == aspect), aspect.capitalize())
+        logger.info(f"Аспект '{aspect}' ('{aspect_label}') всех стран: {values}")
+        lines = []
+        for cname, val in values.items():
+            if val and val.strip():
+                lines.append(f"{aspect_label} {cname}: {val.strip()}")
+            else:
+                lines.append(f"{aspect_label} {cname}: (нет данных)")
+        return f"{aspect_label} всех стран:\n" + "\n".join(lines)
+
+    # --- если country != "все"
     if aspect == "описание":
         if not country:
             logger.info("Страна не определена, возвращаем пустую строку")
@@ -112,10 +146,11 @@ async def get_rag_context(user_id: int, user_text: str) -> str:
     uid = await get_user_id_by_country(country)
     if not uid:
         logger.info(f"Страна '{country}' не найдена в базе!")
-        return f"Страна {country} не найдена."
+        return ""
     value = await get_user_aspect(uid, aspect)
     aspect_label = next((label for code, label, _ in ASPECTS if code == aspect), aspect.capitalize())
     logger.info(f"Аспект '{aspect}' ('{aspect_label}') страны '{country}': {value}")
     if value and value.strip():
         return f"{aspect_label} страны {country}: {value.strip()}"
     return ""
+

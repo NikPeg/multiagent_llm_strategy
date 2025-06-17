@@ -1,6 +1,7 @@
 import aiosqlite
 from typing import List, Optional, Any
 from config import HISTORY_LIMIT
+from game import ASPECTS
 
 ASPECT_CODES = [
     "экономика",
@@ -332,3 +333,29 @@ async def get_all_country_synonyms_and_names():
         for syn, main in synonyms:
             result.append((syn.lower(), main))   # синоним
         return result
+
+async def get_all_user_country_descs():
+    """
+    Возвращает словарь {country_name: description}
+    Только для активных стран (country IS NOT NULL)
+    """
+    async with aiosqlite.connect("chats.db") as db:
+        async with db.execute(
+                "SELECT country, country_desc FROM user_states WHERE country IS NOT NULL"
+        ) as cursor:
+            rows = await cursor.fetchall()
+            return {row[0]: row[1] for row in rows}
+
+async def get_all_user_aspect_values(aspect):
+    """
+    Возвращает словарь {country_name: aspect_value}
+    Только для активных стран (country IS NOT NULL)
+    """
+    if aspect not in [a[0] for a in ASPECTS]:
+        raise ValueError("Недопустимый код аспекта")
+    async with aiosqlite.connect("chats.db") as db:
+        async with db.execute(
+                f"SELECT country, {aspect} FROM user_states WHERE country IS NOT NULL"
+        ) as cursor:
+            rows = await cursor.fetchall()
+            return {row[0]: row[1] for row in rows}
