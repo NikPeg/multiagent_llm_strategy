@@ -68,14 +68,12 @@ def detect_aspect_and_scope(user_text: str, all_countries: list[str]) -> tuple[s
     for c in all_countries:
         if c is not None and c.strip():  # страховка от None
             # Проверяем по вхождению фрагмента (можно доработать морфологически)
-            name_fragment = c.lower()
+            name_fragment = c.lower()[:-1]
             # Чтобы не ловить на своё
             if name_fragment in ut and ut.find(name_fragment) > 0:
                 return aspect_detected, "other", c
 
     return aspect_detected, "self", None
-
-# ----
 
 async def get_rag_context(user_id: int, user_text: str) -> str:
     """
