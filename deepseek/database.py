@@ -1,5 +1,6 @@
 import aiosqlite
 from typing import List, Optional, Any
+from config import HISTORY_LIMIT
 
 ASPECT_CODES = [
     "экономика",
@@ -59,6 +60,31 @@ async def update_history(user_id: int, message: str, response: str, history_limi
             (user_id, json.dumps(history))
         )
         await db.commit()
+
+async def add_event_to_history(user_id: int, event_text: str, history_limit: int = HISTORY_LIMIT):
+    """
+    Добавляет событие в историю пользователя.
+    """
+    # Получаем текущую историю через уже существующую функцию
+    history = await get_history(user_id)
+    history.append(f"Событие: {event_text}")
+    history = history[-history_limit:]
+
+    async with aiosqlite.connect("chats.db") as db:
+        await db.execute(
+            "INSERT OR REPLACE INTO chats (user_id, history) VALUES (?, ?)",
+            (user_id, json.dumps(history))
+        )
+        await db.commit()
+
+async def add_event_to_history_all(event_text: str, history_limit: int = HISTORY_LIMIT):
+    """
+    Добавляет событие в историю всех активных стран (игроков).
+    """
+    countries = await get_all_active_countries()
+    for row in countries:
+        user_id = row[0]
+        await add_event_to_history(user_id, event_text, history_limit)
 
 async def clear_history(user_id: int):
     async with aiosqlite.connect("chats.db") as db:

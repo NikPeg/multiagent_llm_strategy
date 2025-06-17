@@ -15,6 +15,8 @@ from database import (
     set_user_country,
     set_user_country_desc,
     set_aspect_index,
+    add_event_to_history,
+    add_event_to_history_all,
 )
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from utils import answer_html, send_html, stars_to_bold
@@ -368,6 +370,7 @@ async def confirm_event_send(message: types.Message, state: FSMContext):
             user_id = row[0]
             try:
                 await message.bot.send_message(user_id, f"⚡️ <b>В вашей стране случилось новое событие:</b>\n\n{event_text}", parse_mode="HTML")
+                await add_event_to_history_all(event_text)
             except Exception as e:
                 continue
         await answer_html(message, "Событие отправлено всем странам!", reply_markup=None)
@@ -380,6 +383,7 @@ async def confirm_event_send(message: types.Message, state: FSMContext):
         return
     try:
         await message.bot.send_message(user_id, f"⚡️ <b>В вашей стране случилось новое событие:</b>\n\n{event_text}", parse_mode="HTML")
+        await add_event_to_history(user_id, event_text)
         await answer_html(message, "Событие отправлено игроку.", reply_markup=None)
     except Exception as e:
         await answer_html(message, "Ошибка при отправке события игроку.", reply_markup=None)
