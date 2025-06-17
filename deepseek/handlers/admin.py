@@ -16,6 +16,7 @@ from database import (
     set_user_country_desc,
     set_aspect_index,
 )
+from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from utils import answer_html, send_html, stars_to_bold
 from .fsm import EditAspect
 from game import ASPECTS
