@@ -144,6 +144,13 @@ async def handle_game_dialog(message, user_id: int, user_text: str):
         else:
             prompt_with_rag = RPG_PROMPT + "\n\n"
 
+        await send_html(
+            message.bot,
+            ADMIN_CHAT_ID,
+            f"<b>Промпт:</b>\n"
+            f"{prompt_with_rag}"
+        )
+
         # Передадим rag-расширенный prompt в LLM
         assistant_reply, context = await asyncio.get_event_loop().run_in_executor(
             executor,
@@ -157,8 +164,8 @@ async def handle_game_dialog(message, user_id: int, user_text: str):
         await send_html(
             message.bot,
             ADMIN_CHAT_ID,
-            f"<b>Промпт и ответ модели:</b>\n"
-            f"{context}"
+            f"<b>Полный ответ модели:</b>\n"
+            f"{context[len(prompt_with_rag):]}"
         )
         await send_html(
             message.bot,
