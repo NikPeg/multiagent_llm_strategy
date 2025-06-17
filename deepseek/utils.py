@@ -62,31 +62,38 @@ async def keep_typing(bot, chat_id):
     except Exception as e:
         logger.error(f"Ошибка в keep_typing: {str(e)}", exc_info=True)
 
-def clean_ai_response(text: str) -> str:
+def clean_ai_response(text: str, separator: str = None) -> str:
     """
-    Возвращает текст между первым <think> или &lt;think&gt; (исключая тег)
+    Возвращает текст между первым <think> или </think> (исключая тег)
     и первым 'Игрок:' (не включая саму метку).
+    Если separator задан, дополнительно обрезает результат по нему (не включая separator).
     Если что-то осталось — возвращает это (strip).
     Если ничего не найдено — возвращает исходный текст.
     """
     end = -1
-    for close_tag in ('&lt;/think&gt;', '</think>'):
+    for close_tag in ('</think>', '&lt;/think&gt;'):
         open_idx = text.find(close_tag)
         if open_idx != -1:
             end = open_idx
             break
 
     # ищем "Игрок:" до закрывающего тега
-    remaining = text[:end]
+    remaining = text[:end] if end != -1 else text
     key = "Игрок:"
     close_idx = remaining.find(key)
     if close_idx != -1:
         result = remaining[:close_idx].strip()
     else:
         result = remaining.strip()
+
+    # Если задан разделитель, дополнительно обрезаем по нему
+    if separator:
+        sep_idx = result.find(separator)
+        if sep_idx != -1:
+            result = result[:sep_idx].strip()
+
     # Если результат не пустой — вернуть его, иначе вернуть исходник
     return result if result else text.strip()
-
 
 def stars_to_bold(text):
     # Заменяем все **text** на <b>text</b>
