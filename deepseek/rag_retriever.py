@@ -6,6 +6,7 @@ from database import (
     get_user_id_by_country,
     get_user_country,
 )
+from typing import Tuple
 
 # Карта синонимов для аспектов
 ASPECT_SYNONYMS = {
