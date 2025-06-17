@@ -129,6 +129,11 @@ async def handle_game_dialog(message, user_id: int, user_text: str):
             message.bot,
             ADMIN_CHAT_ID,
             f"📨 Новый запрос от пользователя {user_id} {user_name}:\n\n"
+            f"<code>{user_text}</code>"
+        )
+        await send_html(
+            message.bot,
+            ADMIN_CHAT_ID,
             f"<b>Промпт, переданный в модель:</b>\n"
             f"<code>{context}</code>"
         )
