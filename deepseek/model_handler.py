@@ -68,7 +68,7 @@ class ModelHandler:
 
             loop.run_until_complete(update_history(user_id, message_text, ai_response, history_limit))
             loop.close()
-            return ai_response, context
+            return ai_response, response
         except Exception as e:
             logger.error(f"Ошибка в generate_response: {str(e)}", exc_info=True)
             raise

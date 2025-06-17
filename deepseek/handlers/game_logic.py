@@ -156,13 +156,13 @@ async def handle_game_dialog(message, user_id: int, user_text: str):
         await send_html(
             message.bot,
             ADMIN_CHAT_ID,
-            f"<b>Промпт, переданный в модель:</b>\n"
-            f"<code>{context}</code>"
+            f"<b>Промпт и ответ модели:</b>\n"
+            f"{context}"
         )
         await send_html(
             message.bot,
             ADMIN_CHAT_ID,
-            f"<b>Ответ модели:</b>\n"
+            f"<b>Ответ игроку:</b>\n"
             f"<code>{assistant_reply}</code>",
         )
     except Exception as e:
