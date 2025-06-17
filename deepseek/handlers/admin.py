@@ -19,6 +19,7 @@ from database import (
 from utils import answer_html, send_html, stars_to_bold
 from .fsm import EditAspect
 from game import ASPECTS
+from event_generator import generate_event_for_country
 
 router = Router()
 
@@ -309,6 +310,27 @@ async def admin_help(message: types.Message):
         "\n<b>Доступные аспекты:</b>\n"
         + "\n".join(f"<b>{a[0]}</b>: {a[1]}" for a in ASPECTS) +
         "\n<b>описание</b>: Описание страны"
+    )
+
+@router.message(Command("ivent"))
+async def admin_generate_event(message: types.Message):
+    if message.chat.id != ADMIN_CHAT_ID:
+        await answer_html(message, "У вас нет прав на эту команду.")
+        return
+
+    args = message.text.split(maxsplit=1)[1:]
+    if not args:
+        await answer_html(message, "Формат: /ivent <название_страны>")
+        return
+
+    country_name = args[0].strip()
+    await answer_html(message, f"⏳ Генерация ивента для {country_name}...")
+
+    event_text = await generate_event_for_country(country_name)
+
+    await answer_html(
+        message,
+        f"<b>Событие для страны {country_name}:</b>\n\n{event_text}"
     )
 
 def register(dp):
