@@ -3,21 +3,7 @@ from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 
 from config import ADMIN_CHAT_ID
-from database import (
-    get_all_active_countries,
-    get_user_id_by_country,
-    get_user_aspect,
-    set_user_aspect,
-    get_user_country_desc,
-    set_user_country_desc,
-    clear_history,
-    clear_user_aspects,
-    set_user_country,
-    set_user_country_desc,
-    set_aspect_index,
-    add_event_to_history,
-    add_event_to_history_all,
-)
+from database import *
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
 from utils import answer_html, send_html, stars_to_bold
 from .fsm import EditAspect
@@ -26,6 +12,8 @@ from event_generator import generate_event_for_country
 from .fsm import ConfirmEvent, AdminSendMessage
 
 router = Router()
+
+from database import get_country_by_synonym_or_name  # Не забудьте импортировать!
 
 @router.message(Command("info"))
 async def info(message: types.Message):
@@ -126,42 +114,46 @@ async def info(message: types.Message):
     # /info <аспект> <название_страны>
     if len(args) >= 2:
         aspect = args[0].lower()
-        country = " ".join(args[1:]).strip().lower()
-        if country not in countries_dict:
+        country_input = " ".join(args[1:]).strip()
+        main_country_name = await get_country_by_synonym_or_name(country_input)
+
+        if not main_country_name or main_country_name.strip().lower() not in countries_dict:
             await answer_html(message, "Страна не найдена.")
             return
+        country_info = countries_dict[main_country_name.strip().lower()]
+
         if aspect not in aspect_labels:
             await answer_html(message, "Аспект не найден.")
             return
         if aspect == "описание":
-            desc = await get_user_country_desc(countries_dict[country]['user_id'])
+            desc = await get_user_country_desc(country_info['user_id'])
             if desc and desc.strip():
                 await send_html(
                     message.bot,
                     ADMIN_CHAT_ID,
-                    f"<b>Описание страны</b> для <b>{countries_dict[country]['country_name']}</b>:\n{desc}"
+                    f"<b>Описание страны</b> для <b>{country_info['country_name']}</b>:\n{desc}"
                 )
             else:
                 await send_html(
                     message.bot,
                     ADMIN_CHAT_ID,
-                    f"Описание страны для <b>{countries_dict[country]['country_name']}</b> не найдено."
+                    f"Описание страны для <b>{country_info['country_name']}</b> не найдено."
                 )
             return
         idx = aspect_codes.index(aspect)
-        value = countries_dict[country]["aspects"][idx]
+        value = country_info["aspects"][idx]
         label = aspect_labels[aspect]
         if value and value.strip():
             await send_html(
                 message.bot,
                 ADMIN_CHAT_ID,
-                f"<b>{label}</b> для страны <b>{countries_dict[country]['country_name']}</b>:\n{stars_to_bold(value)}"
+                f"<b>{label}</b> для страны <b>{country_info['country_name']}</b>:\n{stars_to_bold(value)}"
             )
         else:
             await send_html(
                 message.bot,
                 ADMIN_CHAT_ID,
-                f"Аспект <b>{label}</b> для страны <b>{countries_dict[country]['country_name']}</b> не найден."
+                f"Аспект <b>{label}</b> для страны <b>{country_info['country_name']}</b> не найден."
             )
         return
 
@@ -425,6 +417,27 @@ async def admin_do_send_message(message: types.Message, state: FSMContext):
         await answer_html(message, "Сообщение отправлено стране.")
     except Exception:
         await answer_html(message, "Ошибка при отправке сообщения игроку.")
+
+@router.message(Command("contries"))
+async def admin_list_country_synonyms(message: types.Message):
+    if message.chat.id != ADMIN_CHAT_ID:
+        await answer_html(message, "У вас нет прав на эту команду.")
+        return
+
+    country_synonyms = await get_all_countries_and_synonyms()
+    if not country_synonyms:
+        await answer_html(message, "Страны не обнаружены.")
+        return
+
+    lines = []
+    for country, synonyms in country_synonyms.items():
+        if synonyms:
+            lines.append(f"<b>{country}</b>: {', '.join(synonyms)}")
+        else:
+            lines.append(f"<b>{country}</b>: -")
+
+    text = "<b>Страны и их синонимы:</b>\n" + "\n".join(lines)
+    await answer_html(message, text)
 
 def register(dp):
     dp.include_router(router)

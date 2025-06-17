@@ -290,3 +290,26 @@ async def get_synonyms_for_country(country: str) -> List[str]:
         ) as cursor:
             synonyms = await cursor.fetchall()
             return [row[0] for row in synonyms]
+
+async def get_all_countries_and_synonyms():
+    """
+    Возвращает словарь: {country: [synonym1, synonym2, ...], ...}
+    """
+    async with aiosqlite.connect("chats.db") as db:
+        # Получим список всех стран (их основное имя)
+        async with db.execute("SELECT country FROM user_states WHERE country IS NOT NULL") as cursor:
+            countries = [row[0] for row in await cursor.fetchall()]
+
+        # Получим все синонимы
+        async with db.execute("SELECT country, synonym FROM country_synonyms") as cursor:
+            synonyms = await cursor.fetchall()
+
+        # Группируем
+        country_to_synonyms = {c: [] for c in countries}
+        for country, synonym in synonyms:
+            if country in country_to_synonyms:
+                country_to_synonyms[country].append(synonym)
+            else:
+                # Иногда могут быть синонимы для неактивных стран
+                country_to_synonyms[country] = [synonym]
+        return country_to_synonyms
