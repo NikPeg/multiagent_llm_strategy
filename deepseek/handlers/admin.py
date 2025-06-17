@@ -264,6 +264,10 @@ async def admin_delete_country(message: types.Message):
         return
 
     country_name = args[0].strip()
+    # Если страна состоит из нескольких слов — ждём их слитно:
+    if len(args) > 1:
+        country_name = " ".join(args).strip()
+
     user_id = await get_user_id_by_country(country_name)
     if not user_id:
         await answer_html(message, f'Страна "{country_name}" не найдена.')
@@ -308,6 +312,10 @@ async def admin_generate_event(message: types.Message, state: FSMContext):
         return
 
     country_name = args[0].strip()
+    # Если страна состоит из нескольких слов — ждём их слитно:
+    if len(args) > 1:
+        country_name = " ".join(args).strip()
+
     await answer_html(message, f"⏳ Генерация ивента для {country_name}...")
 
     # Сгенерировать для одной страны или для всех
@@ -380,6 +388,9 @@ async def admin_prepare_send_message(message: types.Message, state: FSMContext):
         return
 
     target = args[0].strip()
+    # Если страна состоит из нескольких слов — ждём их слитно:
+    if len(args) > 1:
+        target = " ".join(args).strip()
     await state.set_state(AdminSendMessage.waiting_message)
     await state.update_data(target=target)
 
