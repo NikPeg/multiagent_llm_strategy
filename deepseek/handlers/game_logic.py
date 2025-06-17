@@ -9,6 +9,7 @@ from model_handler import model_handler, executor
 # Импорт функций получения страны/описания по user_id, если требуется
 from database import get_user_country, get_user_country_desc
 from keyboard import ASPECTS_KEYBOARD
+from rag_retriever import get_rag_context
 
 async def handle_country_name(message, user_id: int, user_text: str):
     await set_user_country(user_id, user_text)
@@ -104,10 +105,21 @@ async def handle_game_dialog(message, user_id: int, user_text: str):
         country_name = await get_user_country(user_id)
         country_desc = await get_user_country_desc(user_id)
 
+        # Получить RAG-контекст (расширенную справку) для вставки в промпт к модели
+        rag_context = await get_rag_context(user_id, user_text)
+
+        # RPG_PROMPT + rag_context + история + пользовательский запрос
+        # Модифицируем RPG_PROMPT если rag_context есть
+        if rag_context:
+            prompt_with_rag = f"{RPG_PROMPT}\n\n{rag_context}\n"
+        else:
+            prompt_with_rag = RPG_PROMPT
+
+        # Передадим rag-расширенный prompt в LLM
         assistant_reply, context = await asyncio.get_event_loop().run_in_executor(
             executor,
             model_handler.sync_generate_response,
-            user_id, user_text, RPG_PROMPT, country_name, country_desc, HISTORY_LIMIT
+            user_id, user_text, prompt_with_rag, country_name, country_desc, HISTORY_LIMIT
         )
         typing_task.cancel()
         html_reply = stars_to_bold(assistant_reply)
@@ -118,7 +130,11 @@ async def handle_game_dialog(message, user_id: int, user_text: str):
             ADMIN_CHAT_ID,
             f"📨 Новый запрос от пользователя {user_id} {user_name}:\n\n"
             f"<b>Промпт, переданный в модель:</b>\n"
-            f"<code>{context}</code>\n\n"
+            f"<code>{context}</code>"
+        )
+        await send_html(
+            message.bot,
+            ADMIN_CHAT_ID,
             f"<b>Ответ модели:</b>\n"
             f"<code>{assistant_reply}</code>",
         )

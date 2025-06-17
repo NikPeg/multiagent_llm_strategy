@@ -190,6 +190,19 @@ async def get_all_active_countries():
             countries = await cursor.fetchall()
             return countries
 
+async def get_all_country_names():
+    """
+    Возвращает список названий всех стран (country) для активных пользователей.
+    """
+    async with aiosqlite.connect("chats.db") as db:
+        async with db.execute(
+                "SELECT country FROM user_states WHERE country IS NOT NULL"
+        ) as cursor:
+            rows = await cursor.fetchall()
+            # rows — список кортежей вроде [('Греция',), ('Египет',)]
+            return [row[0] for row in rows]
+
+
 async def get_user_id_by_country(country: str) -> Optional[int]:
     async with aiosqlite.connect("chats.db") as db:
         async with db.execute(
