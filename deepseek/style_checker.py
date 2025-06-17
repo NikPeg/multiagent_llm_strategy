@@ -40,13 +40,12 @@ MODERN_WORDS = [
     "супермаркет", "магазин", "платеж", "перевод", "кафе", "ресторан", "полиция", "сирена", "пожарн", "маркетинг", "маркет", "логист",
 ]
 
-def contains_modern_words(text: str) -> bool:
+def contains_modern_words(text: str):
     """
-    Возвращает True, если в тексте встречается слово из списка модернистских,
-    иначе False.
+    Если найден запрещённый корень — возвращает его (строку), иначе возвращает None.
     """
     lower_text = text.lower()
     for word in MODERN_WORDS:
         if word in lower_text:
-            return True
-    return False
+            return word
+    return None

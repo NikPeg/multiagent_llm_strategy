@@ -25,11 +25,12 @@ async def handle_country_desc(message, user_id: int, user_text: str):
     chat_id = message.chat.id
 
     # Проверка на современные слова
-    if contains_modern_words(user_text):
+    bad_word = contains_modern_words(user_text)
+    if bad_word:
         await answer_html(
             message,
-            "❗️Описание содержит слова, не подходящие для эпохи древнего мира. "
-            "Пожалуйста, перепиши описание, избегая современных понятий (например, автомобили, интернет, доллары и т.п.)"
+            f"❗️Описание содержит слова, не подходящие для эпохи древнего мира — например, <b>{bad_word}</b>. "
+            "Пожалуйста, перепиши описание, избегая современных понятий (автомобили, интернет, доллары и т.п.)"
         )
         return
 
@@ -109,11 +110,12 @@ async def handle_game_dialog(message, user_id: int, user_text: str):
     user_name = message.from_user.username
 
     # Проверка на запрещённые современные слова
-    if contains_modern_words(user_text):
+    bad_word = contains_modern_words(user_text)
+    if bad_word:
         await answer_html(
             message,
-            "❗️Ваше сообщение содержит слова и понятия, не подходящие для эпохи древнего мира. "
-            "Пожалуйста, пишите так, чтобы ваши приказы, вопросы и описания соответствовали антуражу древностей (без упоминаний современных технологий, денег, профессий и т.п.).",
+            f"❗️Описание содержит слова, не подходящие для эпохи древнего мира — например, <b>{bad_word}</b>. "
+            "Пожалуйста, перепиши описание, избегая современных понятий (автомобили, интернет, доллары и т.п.)",
             reply_markup=ASPECTS_KEYBOARD,
         )
         return
