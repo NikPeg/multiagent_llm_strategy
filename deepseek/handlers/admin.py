@@ -418,7 +418,7 @@ async def admin_do_send_message(message: types.Message, state: FSMContext):
     except Exception:
         await answer_html(message, "Ошибка при отправке сообщения игроку.")
 
-@router.message(Command("contries"))
+@router.message(Command("countries"))
 async def admin_list_country_synonyms(message: types.Message):
     if message.chat.id != ADMIN_CHAT_ID:
         await answer_html(message, "У вас нет прав на эту команду.")
