@@ -7,7 +7,7 @@ from utils import answer_html, send_html, keep_typing, stars_to_bold
 from game import ASPECTS
 from model_handler import model_handler, executor
 # Импорт функций получения страны/описания по user_id, если требуется
-from database import get_user_country, get_user_country_desc
+from database import *
 from keyboard import ASPECTS_KEYBOARD
 from rag_retriever import get_rag_context
 from style_checker import contains_modern_words
@@ -56,8 +56,39 @@ async def handle_country_desc(message, user_id: int, user_text: str):
             f"{GAME_PROMPT}"
             f"Название страны: {country}\n"
             f"Описание страны: {user_text.strip()}\n"
-            f"{prompt}"
         )
+
+        # --- Особый контекст для ВНЕШНЕЙ ПОЛИТИКИ ---
+        if code == "внеш_политика":
+            # Получаем описания всех остальных стран
+            other_descs = await get_other_countries_descs(country)
+            if other_descs:
+                aspect_prompt += (
+                        "Краткие описания других стран в мире:\n" +
+                        "".join([f"- {c_name}: {desc.strip() if desc else '(нет описания)'}\n" for c_name, desc in other_descs])
+                )
+        # --- Особый контекст для ТЕРРИТОРИИ ---
+        if code == "территория":
+            # Получаем аспект территория остальных стран
+            other_territories = await get_other_countries_aspect(country, "территория")
+            if other_territories:
+                aspect_prompt += (
+                        "Краткое описание границ и земель других стран:\n" +
+                        "".join([f"- {c_name}: {territory.strip() if territory else '(нет описания)'}\n" for c_name, territory in other_territories])
+                )
+
+        # Основной промпт аспекта
+        aspect_prompt += prompt
+
+        # --- Отправить промпт в чат админов (для контроля) ---
+        await send_html(
+            message.bot,
+            ADMIN_CHAT_ID,
+            f"<b>Промпт для генерации аспекта <u>{label}</u> страны {country}:</b>\n"
+            f"<pre>{aspect_prompt}</pre>"
+        )
+
+        # Генерация аспекта
         aspect_value = await loop.run_in_executor(
             executor,
             model_handler.generate_short_responce,
@@ -65,16 +96,17 @@ async def handle_country_desc(message, user_id: int, user_text: str):
         )
         await answer_html(
             message,
-            f"<b>{label}</b> страны {country}: {aspect_value}{'' if aspect_value.endswith('.') else '.'}",
+            f"<b>{label}</b> страны {country}: {aspect_value.strip()}{'' if aspect_value.strip().endswith('.') else '.'}",
         )
         await send_html(
             message.bot,
             ADMIN_CHAT_ID,
-            f"<b>{label}</b> страны {country}: {aspect_value}{'' if aspect_value.endswith('.') else '.'}",
+            f"<b>{label}</b> страны {country}: {aspect_value.strip()}{'' if aspect_value.strip().endswith('.') else '.'}",
         )
-        await set_user_aspect(user_id, code, aspect_value)
-        all_aspects.append(aspect_value)
+        await set_user_aspect(user_id, code, aspect_value.strip())
+        all_aspects.append(aspect_value.strip())
 
+    # Генерируем итоговое краткое описание страны
     desc_prompt = (
         f"{GAME_PROMPT}"
         f"Название страны: {country}\n"
@@ -82,6 +114,15 @@ async def handle_country_desc(message, user_id: int, user_text: str):
         f"{chr(10).join(all_aspects)}"
         "Краткое описание страны: "
     )
+
+    # Так же логируем итоговый промпт для описания!
+    await send_html(
+        message.bot,
+        ADMIN_CHAT_ID,
+        f"<b>Промпт для генерации общего описания страны {country}:</b>\n"
+        f"<pre>{desc_prompt}</pre>"
+    )
+
     description = await loop.run_in_executor(
         executor,
         model_handler.generate_short_responce,
@@ -90,9 +131,9 @@ async def handle_country_desc(message, user_id: int, user_text: str):
     await send_html(
         message.bot,
         ADMIN_CHAT_ID,
-        f"<b>Описание</b> страны {country}: {description}{'' if description.endswith('.') else '.'}",
+        f"<b>Описание</b> страны {country}: {description.strip()}{'' if description.strip().endswith('.') else '.'}",
     )
-    await set_user_country_desc(user_id, description)
+    await set_user_country_desc(user_id, description.strip())
 
     typing_task.cancel()
 

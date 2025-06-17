@@ -359,3 +359,15 @@ async def get_all_user_aspect_values(aspect):
         ) as cursor:
             rows = await cursor.fetchall()
             return {row[0]: row[1] for row in rows}
+
+async def get_other_countries_descs(current_country):
+    async with aiosqlite.connect("chats.db") as db:
+        async with db.execute(
+                "SELECT country, country_desc FROM user_states WHERE country IS NOT NULL AND country <> ?", (current_country,)) as cursor:
+            return [(row[0], row[1]) for row in await cursor.fetchall()]
+
+async def get_other_countries_aspect(current_country, aspect_code):
+    async with aiosqlite.connect("chats.db") as db:
+        async with db.execute(
+                f"SELECT country, {aspect_code} FROM user_states WHERE country IS NOT NULL AND country <> ?", (current_country,)) as cursor:
+            return [(row[0], row[1]) for row in await cursor.fetchall()]
