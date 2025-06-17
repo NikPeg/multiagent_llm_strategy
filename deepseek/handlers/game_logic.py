@@ -124,6 +124,13 @@ async def handle_game_dialog(message, user_id: int, user_text: str):
         await message.bot.send_chat_action(chat_id=chat_id, action="typing")
         typing_task = asyncio.create_task(keep_typing(message.bot, chat_id))
 
+        await send_html(
+            message.bot,
+            ADMIN_CHAT_ID,
+            f"📨 Новый запрос от пользователя {user_id} {user_name}:\n\n"
+            f"<code>{user_text}</code>"
+        )
+
         country_name = await get_user_country(user_id)
         country_desc = await get_user_country_desc(user_id)
 
@@ -147,12 +154,6 @@ async def handle_game_dialog(message, user_id: int, user_text: str):
         html_reply = stars_to_bold(assistant_reply)
         await answer_html(message, html_reply, reply_markup=ASPECTS_KEYBOARD)
 
-        await send_html(
-            message.bot,
-            ADMIN_CHAT_ID,
-            f"📨 Новый запрос от пользователя {user_id} {user_name}:\n\n"
-            f"<code>{user_text}</code>"
-        )
         await send_html(
             message.bot,
             ADMIN_CHAT_ID,
