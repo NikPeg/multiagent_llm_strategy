@@ -70,6 +70,12 @@ async def detect_aspect_and_country(user_id: int, user_text: str) -> Tuple[str, 
 
     return aspect, country_name
 
+import asyncio
+
+loop = asyncio.new_event_loop()
+asyncio.set_event_loop(loop)
+print(loop.run_until_complete((1, "Расскажи про ХФ")))
+
 async def get_rag_context(user_id: int, user_text: str) -> str:
     """
     Возвращает текстовое описание аспекта для вставки в промпт.
