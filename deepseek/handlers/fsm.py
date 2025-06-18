@@ -14,3 +14,7 @@ class AdminSendMessage(StatesGroup):
 
 class AddCountrySynonym(StatesGroup):
     waiting_for_synonym = State()
+
+class SendMessageFSM(StatesGroup):
+    waiting_for_country = State()
+    waiting_for_text = State()

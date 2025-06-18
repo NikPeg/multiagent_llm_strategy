@@ -4,6 +4,7 @@ from aiogram.filters import Command
 from utils import answer_html
 from database import *
 from aiogram.fsm.context import FSMContext
+from .fsm import SendMessageFSM
 
 router = Router()
 
@@ -46,48 +47,60 @@ async def new_chat(message: types.Message):
     await answer_html(message, "Контекст диалога сброшен!⚔️")
 
 @router.message(Command("send"))
-async def player_send_message(message: types.Message, state: FSMContext):
-    user_id = message.from_user.id
-    # Получаем название страны игрока-отправителя
-    sender_country = await get_country_name_by_user_id(user_id)
-
+async def cmd_send(message: types.Message, state: FSMContext):
+    # Парсим страну из команды, если передана
     args = message.text.split(maxsplit=1)[1:]
-    if not args or len(args[0].strip().split()) == 0:
-        await message.reply("Формат: /send <название_страны> <текст послания>")
-        return
-
-    # Получаем предполагаемое название страны и текст послания
-    remaining = args[0].strip()
-    if ' ' in remaining:
-        country_name, msg = remaining.split(' ', 1)
+    if args:
+        country = args[0].strip()
+        await state.update_data(country=country)
+        recipient_user_id = await get_user_id_by_country(country)
+        if not recipient_user_id:
+            await message.answer(f"Страна '{country}' не найдена. Введите корректное название страны.")
+            await state.set_state(SendMessageFSM.waiting_for_country)
+            return
+        await state.set_state(SendMessageFSM.waiting_for_text)
+        await message.answer(f"Введите текст сообщения для страны '{country}':")
     else:
-        await message.reply("Введите название страны и текст послания, например: /send Германия Привет!")
-        return
+        await message.answer("Укажите название страны, например:\n/send Германия")
+        await state.set_state(SendMessageFSM.waiting_for_country)
 
-    country_name = country_name.strip()
-    msg = msg.strip()
-    if not country_name or not msg:
-        await message.reply("Введите название страны и текст послания, например: /send Германия Привет!")
-        return
 
-    # Получаем user_id получателя
-    recipient_user_id = await get_user_id_by_country(country_name)
+@router.message(SendMessageFSM.waiting_for_country)
+async def ask_country(message: types.Message, state: FSMContext):
+    country = message.text.strip()
+    recipient_user_id = await get_user_id_by_country(country)
     if not recipient_user_id:
-        await message.reply(f"Страна '{country_name}' не найдена.")
+        await message.answer(f"Страна '{country}' не найдена. Попробуйте ещё раз.")
+        return
+    await state.update_data(country=country)
+    await state.set_state(SendMessageFSM.waiting_for_text)
+    await message.answer(f"Введите текст сообщения для страны '{country}':")
+
+
+@router.message(SendMessageFSM.waiting_for_text)
+async def send_letter(message: types.Message, state: FSMContext):
+    data = await state.get_data()
+    country = data.get("country")
+    recipient_user_id = await get_user_id_by_country(country)
+    if not recipient_user_id:
+        await message.answer(f"Страна '{country}' не найдена, отмена отправки.")
+        await state.clear()
+        return
+    # Получаем страну отправителя
+    sender_country = await get_country_name_by_user_id(message.from_user.id)
+    if recipient_user_id == message.from_user.id:
+        await message.answer("Нельзя отправить послание самому себе.")
+        await state.clear()
         return
 
-    if recipient_user_id == user_id:
-        await message.reply("Нельзя отправлять послание самому себе.")
-        return
-
-    # Формируем и отправляем сообщение получателю
-    text = f"Вам послание из страны {sender_country}: {msg}"
+    text = message.text.strip()
+    send_text = f"Вам послание из страны {sender_country}: {text}"
     try:
-        await message.bot.send_message(recipient_user_id, text)
-        await message.reply("Послание отправлено!")
-    except Exception as e:
-        await message.reply("Ошибка при отправке послания. Возможно, пользователь заблокировал бота или никогда ему не писал.")
-
+        await message.bot.send_message(recipient_user_id, send_text)
+        await message.answer("Послание отправлено!")
+    except Exception:
+        await message.answer("Ошибка: не удалось отправить сообщение получателю (он мог заблокировать бота).")
+    await state.clear()
 
 def register(dp):
     dp.include_router(router)
