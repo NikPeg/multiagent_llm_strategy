@@ -1,7 +1,8 @@
 import aiosqlite
-from typing import List, Optional, Any
+from typing import List, Optional
 from config import HISTORY_LIMIT
 from game import ASPECTS
+import random
 
 ASPECT_CODES = [
     "экономика",
@@ -258,6 +259,14 @@ async def get_country_name_by_user_id(user_id: int) -> Optional[str]:
         ) as cursor:
             result = await cursor.fetchone()
             return result[0] if result else None
+
+async def get_random_country_name() -> Optional[str]:
+    async with aiosqlite.connect("chats.db") as db:
+        async with db.execute("SELECT country FROM user_states") as cursor:
+            countries = [row[0] for row in await cursor.fetchall() if row[0]]
+    if not countries:
+        return None
+    return random.choice(countries)
 
 async def user_exists(user_id: int) -> bool:
     async with aiosqlite.connect("chats.db") as db:

@@ -68,7 +68,11 @@ async def cmd_send(message: types.Message, state: FSMContext):
         await state.set_state(SendMessageFSM.waiting_for_text)
         await message.answer(f"Введите текст послания для державы '{country}':")
     else:
-        await message.answer("Укажите название страны, например: /send Ассирия")
+        example_country = await get_random_country_name()
+        if example_country:
+            await message.answer(f"Укажите название страны, например: /send {example_country}")
+        else:
+            await message.answer("Укажите название страны. В системе пока нет зарегистрированных стран.")
         await state.set_state(SendMessageFSM.waiting_for_country)
 
 @router.message(SendMessageFSM.waiting_for_country)
