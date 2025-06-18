@@ -46,36 +46,41 @@ async def new_chat(message: types.Message):
     await clear_history(user_id)
     await answer_html(message, "Контекст диалога сброшен!⚔️")
 
+def format_ancient_letter(sender_country: str, text: str) -> str:
+    return (
+        f"📜 К воротам вашего дворца явился глашатай из державы {sender_country}!\n\n"
+        f"Передает вам свиток с посланием:\n\n"
+        f"{text}"
+    )
+
 @router.message(Command("send"))
 async def cmd_send(message: types.Message, state: FSMContext):
-    # Парсим страну из команды, если передана
     args = message.text.split(maxsplit=1)[1:]
     if args:
         country = args[0].strip()
-        await state.update_data(country=country)
         recipient_user_id = await get_user_id_by_country(country)
         if not recipient_user_id:
             await message.answer(f"Страна '{country}' не найдена. Введите корректное название страны.")
             await state.set_state(SendMessageFSM.waiting_for_country)
             return
+        # Сохраняем страну и ждем текст
+        await state.update_data(country=country)
         await state.set_state(SendMessageFSM.waiting_for_text)
-        await message.answer(f"Введите текст сообщения для страны '{country}':")
+        await message.answer(f"Введите текст послания для державы '{country}':")
     else:
-        await message.answer("Укажите название страны, например:\n/send Германия")
+        await message.answer("Укажите название страны, например: /send Ассирия")
         await state.set_state(SendMessageFSM.waiting_for_country)
-
 
 @router.message(SendMessageFSM.waiting_for_country)
 async def ask_country(message: types.Message, state: FSMContext):
     country = message.text.strip()
     recipient_user_id = await get_user_id_by_country(country)
     if not recipient_user_id:
-        await message.answer(f"Страна '{country}' не найдена. Попробуйте ещё раз.")
+        await message.answer(f"Страна '{country}' не найдена! Попробуйте ещё раз.")
         return
     await state.update_data(country=country)
     await state.set_state(SendMessageFSM.waiting_for_text)
-    await message.answer(f"Введите текст сообщения для страны '{country}':")
-
+    await message.answer(f"Введите текст послания для державы '{country}':")
 
 @router.message(SendMessageFSM.waiting_for_text)
 async def send_letter(message: types.Message, state: FSMContext):
@@ -94,7 +99,7 @@ async def send_letter(message: types.Message, state: FSMContext):
         return
 
     text = message.text.strip()
-    send_text = f"Вам послание из страны {sender_country}: {text}"
+    send_text = format_ancient_letter(sender_country, text)
     try:
         await message.bot.send_message(recipient_user_id, send_text)
         await message.answer("Послание отправлено!")
