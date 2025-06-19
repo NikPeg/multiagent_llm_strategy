@@ -43,9 +43,12 @@ MODERN_WORDS = [
 def contains_modern_words(text: str):
     """
     Если найден запрещённый корень — возвращает его (строку), иначе возвращает None.
+    Совпадение только с начала слова.
     """
     lower_text = text.lower()
-    for word in MODERN_WORDS:
-        if word in lower_text:
-            return word
+    words = re.findall(r'\b\w+', lower_text)
+    for player_word in words:
+        for modern_word in MODERN_WORDS:
+            if player_word.startswith(modern_word):
+                return modern_word
     return None
