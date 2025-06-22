@@ -11,17 +11,23 @@ from database import *
 from keyboard import ASPECTS_KEYBOARD
 from rag_retriever import get_rag_context
 from style_checker import contains_modern_words
+from .fsm import *
 
-async def handle_country_name(message, user_id: int, user_text: str):
+@router.message(RegisterCountry.waiting_for_name)
+async def handle_country_name(message: types.Message, state: FSMContext):
+    user_id = message.from_user.id
+    user_text = message.text.strip()
     await set_user_country(user_id, user_text)
     await answer_html(
         message,
         f"🏺 Ты даровал своей державе имя: <b>{user_text}</b>.\n\n"
-        f"Опиши, как гласит летопись, землю и народ своего царства: его географию, древние обычаи, таланты и традиции. "
+        f"Опиши землю и народ своего царства: его географию, древние обычаи, таланты и традиции. "
         f"Поведай о начальных условиях и уникальных чертах своего государства.\n\n"
         f"✋ Если захочешь изменить имя, просто напиши <b>/cancel</b>.",
     )
+    await state.set_state(RegisterCountry.waiting_for_desc)
 
+@router.message(RegisterCountry.waiting_for_desc)
 async def handle_country_desc(message, user_id: int, user_text: str):
     if user_text.strip().lower() == "/cancel":
         await answer_html(
@@ -160,7 +166,7 @@ async def handle_country_desc(message, user_id: int, user_text: str):
         reply_markup=ASPECTS_KEYBOARD,
     )
 
-
+@router.message(F.text & ~F.text.startswith('/'))
 async def handle_game_dialog(message, user_id: int, user_text: str):
     chat_id = message.chat.id
     user_name = message.from_user.username
