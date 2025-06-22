@@ -77,7 +77,7 @@ async def add_event_to_history(user_id: int, event_text: str, history_limit: int
     """
     # Получаем текущую историю через уже существующую функцию
     history = await get_history(user_id)
-    history.append(f"Событие: {event_text}")
+    history.append(f"Ассистент: {event_text}")
     history = history[-history_limit:]
 
     async with aiosqlite.connect("chats.db") as db:
