@@ -6,6 +6,7 @@ from database import (
 from aiogram import Router, types
 from utils import answer_html, send_html, keep_typing, stars_to_bold
 from game import ASPECTS
+from aiogram.fsm.context import FSMContext
 from model_handler import model_handler, executor
 # Импорт функций получения страны/описания по user_id, если требуется
 from database import *
