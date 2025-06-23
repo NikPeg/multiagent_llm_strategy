@@ -32,7 +32,9 @@ async def handle_country_name(message: types.Message, state: FSMContext):
     await state.set_state(RegisterCountry.waiting_for_desc)
 
 @router.message(RegisterCountry.waiting_for_desc)
-async def handle_country_desc(message, user_id: int, user_text: str):
+async def handle_country_desc(message):
+    user_id = message.from_user.id
+    user_text = message.text.strip()
     if user_text.strip().lower() == "/cancel":
         await answer_html(
             message,
