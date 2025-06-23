@@ -3,6 +3,7 @@ from config import ADMIN_CHAT_ID, GAME_PROMPT, RPG_PROMPT, HISTORY_LIMIT
 from database import (
     set_user_country, set_user_country_desc, set_user_aspect
 )
+from aiogram import Router
 from utils import answer_html, send_html, keep_typing, stars_to_bold
 from game import ASPECTS
 from model_handler import model_handler, executor
@@ -12,6 +13,8 @@ from keyboard import ASPECTS_KEYBOARD
 from rag_retriever import get_rag_context
 from style_checker import contains_modern_words
 from .fsm import *
+
+router = Router()
 
 @router.message(RegisterCountry.waiting_for_name)
 async def handle_country_name(message: types.Message, state: FSMContext):
@@ -241,3 +244,6 @@ async def handle_game_dialog(message, user_id: int, user_text: str):
             ADMIN_CHAT_ID,
             f"Ошибка: {str(e)}"
         )
+
+def register(dp):
+    dp.include_router(router)
