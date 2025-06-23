@@ -1,9 +1,10 @@
-from database import get_user_id_by_country, get_user_country_desc, get_user_aspect
-from game import ASPECTS
-from config import GAME_PROMPT
-from model_handler import model_handler, executor
-
 import asyncio
+
+from config import GAME_PROMPT
+from database import get_user_aspect, get_user_country_desc, get_user_id_by_country
+from game import ASPECTS
+from model_handler import executor, model_handler
+
 
 async def generate_event_for_country(country):
     """
@@ -20,16 +21,16 @@ async def generate_event_for_country(country):
             desc = await get_user_country_desc(user_id)
             descs.append(f"{c}: {desc or '(нет описания)'}")
         prompt = (
-                f"{GAME_PROMPT}\n"
-                "Владыки следующих стран и их государства:\n"
-                + "\n".join(descs) + "\n"
-                "Во времена те среди указанных держав произошло необычайное и значимое событие, привлекшее внимание владык и народов. "
-                "Случившееся стало приметным вехой в летописях древнего мира и изменило путь истории тех земель.\n"
-                "Краткое описание сего события в летописи:"
+            f"{GAME_PROMPT}\n"
+            "Владыки следующих стран и их государства:\n" + "\n".join(descs) + "\n"
+            "Во времена те среди указанных держав произошло необычайное и значимое событие, привлекшее внимание владык и народов. "
+            "Случившееся стало приметным вехой в летописях древнего мира и изменило путь истории тех земель.\n"
+            "Краткое описание сего события в летописи:"
         )
     elif isinstance(country, str) and country.lower() == "все":
         # Получить имена всех стран и применить логику для всех
         from database import get_all_country_names
+
         all_names = await get_all_country_names()
         return await generate_event_for_country(all_names)
     else:

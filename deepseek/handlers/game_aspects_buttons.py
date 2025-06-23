@@ -1,5 +1,6 @@
-from aiogram import Router, types, F
-from database import get_user_aspect, get_user_country_desc, get_user_country
+from aiogram import F, Router, types
+
+from database import get_user_aspect, get_user_country, get_user_country_desc
 from game import ASPECTS
 from utils import answer_html, stars_to_bold
 
@@ -8,6 +9,7 @@ router = Router()
 # Множество всех названий аспектов (лейблы)
 ASPECT_LABELS = {label for _, label, _ in ASPECTS}
 ASPECT_LABEL_TO_CODE = {label: code for code, label, _ in ASPECTS}
+
 
 @router.message(F.text.in_(ASPECT_LABELS | {"Описание страны"}))
 async def handle_aspect_button(message: types.Message):
@@ -32,6 +34,7 @@ async def handle_aspect_button(message: types.Message):
         await answer_html(message, f"<b>{user_text}:</b>\n{stars_to_bold(value)}")
     else:
         await answer_html(message, f"Аспект <b>{user_text}</b> ещё не заполнен для вашей страны.")
+
 
 def register(dp):
     dp.include_router(router)

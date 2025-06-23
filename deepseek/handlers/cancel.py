@@ -1,16 +1,21 @@
-from aiogram import types, Router
+from aiogram import Router, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 
 from utils import answer_html
 
 from .fsm import (
-    EditAspect, ConfirmEvent, AdminSendMessage, AddCountrySynonym,
-    SendMessageFSM, RegisterCountry, ResetCountry
+    AddCountrySynonym,
+    AdminSendMessage,
+    ConfirmEvent,
+    EditAspect,
+    RegisterCountry,
+    ResetCountry,
+    SendMessageFSM,
 )
-from aiogram import types
 
 router = Router()
+
 
 @router.message(Command("cancel"))
 async def global_cancel(message: types.Message, state: FSMContext):
@@ -27,10 +32,7 @@ async def global_cancel(message: types.Message, state: FSMContext):
 
     if current_state.startswith(RegisterCountry.__name__):
         await state.clear()
-        await answer_html(
-            message,
-            "Регистрация страны отменена. Введите новое название своей страны:"
-        )
+        await answer_html(message, "Регистрация страны отменена. Введите новое название своей страны:")
         await state.set_state(RegisterCountry.waiting_for_name)
         return
 
@@ -62,6 +64,7 @@ async def global_cancel(message: types.Message, state: FSMContext):
     # Если вдруг неизвестное состояние
     await state.clear()
     await answer_html(message, "Действие отменено.")
+
 
 def register(dp):
     dp.include_router(router)

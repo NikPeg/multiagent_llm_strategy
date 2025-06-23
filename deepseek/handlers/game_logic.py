@@ -1,21 +1,24 @@
 import asyncio
-from config import ADMIN_CHAT_ID, GAME_PROMPT, RPG_PROMPT, HISTORY_LIMIT
-from database import (
-    set_user_country, set_user_country_desc, set_user_aspect
-)
-from aiogram import Router, types, F
-from utils import answer_html, send_html, keep_typing, stars_to_bold
-from game import ASPECTS
+
+from aiogram import F, Router, types
 from aiogram.fsm.context import FSMContext
-from model_handler import model_handler, executor
+
+from config import ADMIN_CHAT_ID, GAME_PROMPT, HISTORY_LIMIT, RPG_PROMPT
+
 # Импорт функций получения страны/описания по user_id, если требуется
 from database import *
+from database import set_user_aspect, set_user_country, set_user_country_desc
+from game import ASPECTS
 from keyboard import ASPECTS_KEYBOARD
+from model_handler import executor, model_handler
 from rag_retriever import get_rag_context
 from style_checker import contains_modern_words
+from utils import answer_html, keep_typing, send_html, stars_to_bold
+
 from .fsm import *
 
 router = Router()
+
 
 @router.message(RegisterCountry.waiting_for_name)
 async def handle_country_name(message: types.Message, state: FSMContext):
@@ -30,6 +33,7 @@ async def handle_country_name(message: types.Message, state: FSMContext):
         f"✋ Если захочешь изменить имя, просто напиши <b>/cancel</b>.",
     )
     await state.set_state(RegisterCountry.waiting_for_desc)
+
 
 @router.message(RegisterCountry.waiting_for_desc)
 async def handle_country_desc(message: types.Message, state: FSMContext):
@@ -51,7 +55,7 @@ async def handle_country_desc(message: types.Message, state: FSMContext):
         await answer_html(
             message,
             f"❗️Описание содержит слова, не подходящие для эпохи древнего мира — например, <b>{bad_word}</b>. "
-            "Пожалуйста, перепиши описание, избегая современных понятий (автомобили, интернет, доллары и т.п.)"
+            "Пожалуйста, перепиши описание, избегая современных понятий (автомобили, интернет, доллары и т.п.)",
         )
         return
 
@@ -73,29 +77,26 @@ async def handle_country_desc(message: types.Message, state: FSMContext):
     all_aspects = []
 
     for code, label, prompt in ASPECTS:
-        aspect_prompt = (
-            f"{GAME_PROMPT}"
-            f"Название страны: {country}\n"
-            f"Описание страны: {user_text.strip()}\n"
-        )
+        aspect_prompt = f"{GAME_PROMPT}" f"Название страны: {country}\n" f"Описание страны: {user_text.strip()}\n"
 
         # --- Особый контекст для ВНЕШНЕЙ ПОЛИТИКИ ---
         if code == "внеш_политика":
             # Получаем описания всех остальных стран
             other_descs = await get_other_countries_descs(country)
             if other_descs:
-                aspect_prompt += (
-                        "Краткие описания других стран в мире:\n" +
-                        "".join([f"- {c_name}: {desc.strip() if desc else '(нет описания)'}\n" for c_name, desc in other_descs])
+                aspect_prompt += "Краткие описания других стран в мире:\n" + "".join(
+                    [f"- {c_name}: {desc.strip() if desc else '(нет описания)'}\n" for c_name, desc in other_descs]
                 )
         # --- Особый контекст для ТЕРРИТОРИИ ---
         if code == "территория":
             # Получаем аспект территория остальных стран
             other_territories = await get_other_countries_aspect(country, "территория")
             if other_territories:
-                aspect_prompt += (
-                        "Краткое описание границ и земель других стран:\n" +
-                        "".join([f"- {c_name}: {territory.strip() if territory else '(нет описания)'}\n" for c_name, territory in other_territories])
+                aspect_prompt += "Краткое описание границ и земель других стран:\n" + "".join(
+                    [
+                        f"- {c_name}: {territory.strip() if territory else '(нет описания)'}\n"
+                        for c_name, territory in other_territories
+                    ]
                 )
 
         # Основной промпт аспекта
@@ -105,8 +106,7 @@ async def handle_country_desc(message: types.Message, state: FSMContext):
         await send_html(
             message.bot,
             ADMIN_CHAT_ID,
-            f"<b>Промпт для генерации аспекта <u>{label}</u> страны {country}:</b>\n"
-            f"<pre>{aspect_prompt}</pre>"
+            f"<b>Промпт для генерации аспекта <u>{label}</u> страны {country}:</b>\n" f"<pre>{aspect_prompt}</pre>",
         )
 
         # Генерация аспекта
@@ -140,8 +140,7 @@ async def handle_country_desc(message: types.Message, state: FSMContext):
     await send_html(
         message.bot,
         ADMIN_CHAT_ID,
-        f"<b>Промпт для генерации общего описания страны {country}:</b>\n"
-        f"<pre>{desc_prompt}</pre>"
+        f"<b>Промпт для генерации общего описания страны {country}:</b>\n" f"<pre>{desc_prompt}</pre>",
     )
 
     description = await loop.run_in_executor(
@@ -172,7 +171,8 @@ async def handle_country_desc(message: types.Message, state: FSMContext):
         reply_markup=ASPECTS_KEYBOARD,
     )
 
-@router.message(F.text & ~F.text.startswith('/'))
+
+@router.message(F.text & ~F.text.startswith("/"))
 async def handle_game_dialog(message: types.Message, state: FSMContext):
     user_id = message.from_user.id
     user_text = message.text.strip()
@@ -197,8 +197,7 @@ async def handle_game_dialog(message: types.Message, state: FSMContext):
         await send_html(
             message.bot,
             ADMIN_CHAT_ID,
-            f"📨 Новый запрос от пользователя {user_id} {user_name}:\n\n"
-            f"<code>{user_text}</code>"
+            f"📨 Новый запрос от пользователя {user_id} {user_name}:\n\n" f"<code>{user_text}</code>",
         )
 
         country_name = await get_user_country(user_id)
@@ -214,41 +213,34 @@ async def handle_game_dialog(message: types.Message, state: FSMContext):
         else:
             prompt_with_rag = RPG_PROMPT + "\n\n"
 
-        await send_html(
-            message.bot,
-            ADMIN_CHAT_ID,
-            f"<b>Промпт:</b>\n"
-            f"{prompt_with_rag}"
-        )
+        await send_html(message.bot, ADMIN_CHAT_ID, f"<b>Промпт:</b>\n" f"{prompt_with_rag}")
 
         # Передадим rag-расширенный prompt в LLM
         assistant_reply, context = await asyncio.get_event_loop().run_in_executor(
             executor,
             model_handler.sync_generate_response,
-            user_id, user_text, prompt_with_rag, country_name, country_desc, HISTORY_LIMIT
+            user_id,
+            user_text,
+            prompt_with_rag,
+            country_name,
+            country_desc,
+            HISTORY_LIMIT,
         )
         typing_task.cancel()
         html_reply = stars_to_bold(assistant_reply)
         await answer_html(message, html_reply, reply_markup=ASPECTS_KEYBOARD)
 
         await send_html(
-            message.bot,
-            ADMIN_CHAT_ID,
-            f"<b>Полный ответ модели:</b>\n"
-            f"{context[len(prompt_with_rag):]}"
+            message.bot, ADMIN_CHAT_ID, f"<b>Полный ответ модели:</b>\n" f"{context[len(prompt_with_rag):]}"
         )
         await send_html(
             message.bot,
             ADMIN_CHAT_ID,
-            f"<b>Ответ игроку:</b>\n"
-            f"<code>{assistant_reply}</code>",
+            f"<b>Ответ игроку:</b>\n" f"<code>{assistant_reply}</code>",
         )
     except Exception as e:
-        await send_html(
-            message.bot,
-            ADMIN_CHAT_ID,
-            f"Ошибка: {str(e)}"
-        )
+        await send_html(message.bot, ADMIN_CHAT_ID, f"Ошибка: {str(e)}")
+
 
 def register(dp):
     dp.include_router(router)

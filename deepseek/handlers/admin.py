@@ -1,19 +1,21 @@
-from aiogram import types, Router
+from aiogram import Router, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
+from aiogram.types import KeyboardButton, ReplyKeyboardMarkup
 
 from config import ADMIN_CHAT_ID
 from database import *
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
-from utils import answer_html, send_html, stars_to_bold
-from .fsm import *
-from game import ASPECTS
 from event_generator import generate_event_for_country
-from .fsm import ConfirmEvent, AdminSendMessage
+from game import ASPECTS
+from utils import answer_html, send_html, stars_to_bold
+
+from .fsm import *
+from .fsm import AdminSendMessage, ConfirmEvent
 
 router = Router()
 
 from database import get_country_by_synonym_or_name  # Не забудьте импортировать!
+
 
 @router.message(Command("info"))
 async def info(message: types.Message):
@@ -36,7 +38,7 @@ async def info(message: types.Message):
             "user_id": user_id,
             "country_name": country_name,
             "country_desc": country_desc,
-            "aspects": aspect_values
+            "aspects": aspect_values,
         }
 
     aspect_labels = {a[0]: a[1] for a in ASPECTS}
@@ -48,13 +50,13 @@ async def info(message: types.Message):
     # HELP
     if args and args[0].lower() in ("help", "справка", "?"):
         help_text = (
-                "<b>/info</b> — просмотр стран и аспектов\n"
-                "<b>Использование:</b>\n"
-                "/info — все страны и все аспекты\n"
-                "/info <аспект> — этот аспект/описание по всем странам\n"
-                "/info <аспект> <название страны> — выбранный аспект данной страны\n\n"
-                "<b>Доступные коды аспектов:</b>\n" +
-                "\n".join(f"<b>{code}</b>: {aspect_labels[code]}" for code in aspect_codes)
+            "<b>/info</b> — просмотр стран и аспектов\n"
+            "<b>Использование:</b>\n"
+            "/info — все страны и все аспекты\n"
+            "/info <аспект> — этот аспект/описание по всем странам\n"
+            "/info <аспект> <название страны> — выбранный аспект данной страны\n\n"
+            "<b>Доступные коды аспектов:</b>\n"
+            + "\n".join(f"<b>{code}</b>: {aspect_labels[code]}" for code in aspect_codes)
         )
         await send_html(message.bot, ADMIN_CHAT_ID, help_text)
         return
@@ -63,23 +65,11 @@ async def info(message: types.Message):
     if not args:
         for country_tuple in countries:
             user_id, country_name, country_desc, *aspect_values = country_tuple
-            await send_html(
-                message.bot,
-                ADMIN_CHAT_ID,
-                f"🗺 <b>Страна:</b> {country_name} (ID: {user_id})"
-            )
-            await send_html(
-                message.bot,
-                ADMIN_CHAT_ID,
-                f"<b>Описание:</b>\n{country_desc or '(Нет)'}"
-            )
+            await send_html(message.bot, ADMIN_CHAT_ID, f"🗺 <b>Страна:</b> {country_name} (ID: {user_id})")
+            await send_html(message.bot, ADMIN_CHAT_ID, f"<b>Описание:</b>\n{country_desc or '(Нет)'}")
             for (code, label, _), value in zip(ASPECTS, aspect_values):
                 if value and value.strip():
-                    await send_html(
-                        message.bot,
-                        ADMIN_CHAT_ID,
-                        f"<b>{label}</b>:\n{stars_to_bold(value)}"
-                    )
+                    await send_html(message.bot, ADMIN_CHAT_ID, f"<b>{label}</b>:\n{stars_to_bold(value)}")
         return
 
     # /info <аспект>
@@ -95,8 +85,9 @@ async def info(message: types.Message):
                 desc = await get_user_country_desc(user_id)
                 if desc and desc.strip():
                     await send_html(
-                        message.bot, ADMIN_CHAT_ID,
-                        f"<b>{country_name}</b> (ID: {user_id}):\n<b>Описание страны:</b>\n{desc}"
+                        message.bot,
+                        ADMIN_CHAT_ID,
+                        f"<b>{country_name}</b> (ID: {user_id}):\n<b>Описание страны:</b>\n{desc}",
                     )
             return
         idx = aspect_codes.index(aspect)
@@ -106,8 +97,9 @@ async def info(message: types.Message):
             aspect_value = country_tuple[3 + idx]
             if aspect_value and aspect_value.strip():
                 await send_html(
-                    message.bot, ADMIN_CHAT_ID,
-                    f"<b>{country_name}</b> (ID: {user_id}):\n<b>{aspect_labels[aspect]}</b>:\n{stars_to_bold(aspect_value)}"
+                    message.bot,
+                    ADMIN_CHAT_ID,
+                    f"<b>{country_name}</b> (ID: {user_id}):\n<b>{aspect_labels[aspect]}</b>:\n{stars_to_bold(aspect_value)}",
                 )
         return
 
@@ -126,18 +118,16 @@ async def info(message: types.Message):
             await answer_html(message, "Аспект не найден.")
             return
         if aspect == "описание":
-            desc = await get_user_country_desc(country_info['user_id'])
+            desc = await get_user_country_desc(country_info["user_id"])
             if desc and desc.strip():
                 await send_html(
                     message.bot,
                     ADMIN_CHAT_ID,
-                    f"<b>Описание страны</b> для <b>{country_info['country_name']}</b>:\n{desc}"
+                    f"<b>Описание страны</b> для <b>{country_info['country_name']}</b>:\n{desc}",
                 )
             else:
                 await send_html(
-                    message.bot,
-                    ADMIN_CHAT_ID,
-                    f"Описание страны для <b>{country_info['country_name']}</b> не найдено."
+                    message.bot, ADMIN_CHAT_ID, f"Описание страны для <b>{country_info['country_name']}</b> не найдено."
                 )
             return
         idx = aspect_codes.index(aspect)
@@ -147,13 +137,13 @@ async def info(message: types.Message):
             await send_html(
                 message.bot,
                 ADMIN_CHAT_ID,
-                f"<b>{label}</b> для страны <b>{country_info['country_name']}</b>:\n{stars_to_bold(value)}"
+                f"<b>{label}</b> для страны <b>{country_info['country_name']}</b>:\n{stars_to_bold(value)}",
             )
         else:
             await send_html(
                 message.bot,
                 ADMIN_CHAT_ID,
-                f"Аспект <b>{label}</b> для страны <b>{country_info['country_name']}</b> не найден."
+                f"Аспект <b>{label}</b> для страны <b>{country_info['country_name']}</b> не найден.",
             )
         return
 
@@ -163,8 +153,9 @@ async def info(message: types.Message):
         "/info [аспект]\n"
         "/info [аспект] [название страны]\n"
         "/info\n\n"
-        "Для помощи введите /info help"
+        "Для помощи введите /info help",
     )
+
 
 @router.message(Command("edit"))
 async def admin_edit(message: types.Message, state: FSMContext):
@@ -194,7 +185,7 @@ async def admin_edit(message: types.Message, state: FSMContext):
         await answer_html(
             message,
             f"<b>Описание страны</b> для <b>{country_name}</b>:\n\n{current_value or '(нет данных)'}\n\n"
-            "Введите новый текст для этого поля, или /cancel для отмены."
+            "Введите новый текст для этого поля, или /cancel для отмены.",
         )
         await state.set_state(EditAspect.waiting_new_value)
         await state.update_data(user_id=user_id, aspect_code=aspect_code, country_name=country_name)
@@ -209,10 +200,11 @@ async def admin_edit(message: types.Message, state: FSMContext):
     await answer_html(
         message,
         f"<b>{label}</b> для страны <b>{country_name}</b>:\n\n{stars_to_bold(current_value or '(нет данных)')}\n\n"
-        "Введите новый текст для этого поля, или /cancel для отмены."
+        "Введите новый текст для этого поля, или /cancel для отмены.",
     )
     await state.set_state(EditAspect.waiting_new_value)
     await state.update_data(user_id=user_id, aspect_code=aspect_code, country_name=country_name)
+
 
 @router.message(EditAspect.waiting_new_value)
 async def process_new_value(message: types.Message, state: FSMContext):
@@ -229,20 +221,15 @@ async def process_new_value(message: types.Message, state: FSMContext):
 
     if aspect_code == "описание":
         await set_user_country_desc(user_id, new_value)
-        await answer_html(
-            message,
-            f"<b>Описание страны</b> для <b>{country_name}</b> успешно обновлено!"
-        )
+        await answer_html(message, f"<b>Описание страны</b> для <b>{country_name}</b> успешно обновлено!")
         await state.clear()
         return
 
     await set_user_aspect(user_id, aspect_code, new_value)
     label = dict((a[0], a[1]) for a in ASPECTS).get(aspect_code, aspect_code)
-    await answer_html(
-        message,
-        f"<b>{label}</b> для страны <b>{country_name}</b> успешно обновлён!"
-    )
+    await answer_html(message, f"<b>{label}</b> для страны <b>{country_name}</b> успешно обновлён!")
     await state.clear()
+
 
 @router.message(Command("del_country"))
 async def admin_delete_country(message: types.Message):
@@ -305,13 +292,14 @@ async def admin_generate_event(message: types.Message, state: FSMContext):
     kb = ReplyKeyboardMarkup(
         keyboard=[[KeyboardButton(text="Да")], [KeyboardButton(text="Нет")]],
         resize_keyboard=True,
-        one_time_keyboard=True
+        one_time_keyboard=True,
     )
     await answer_html(
         message,
         f"<b>Событие для страны {country_name}:</b>\n\n{event_text}\n\nПодходит ли это событие? (Да/Нет)",
-        reply_markup=kb
+        reply_markup=kb,
     )
+
 
 @router.message(ConfirmEvent.waiting_approve)
 async def confirm_event_send(message: types.Message, state: FSMContext):
@@ -331,7 +319,9 @@ async def confirm_event_send(message: types.Message, state: FSMContext):
         for row in countries:
             user_id = row[0]
             try:
-                await message.bot.send_message(user_id, f"⚡️ <b>В вашей стране случилось новое событие:</b>\n\n{event_text}", parse_mode="HTML")
+                await message.bot.send_message(
+                    user_id, f"⚡️ <b>В вашей стране случилось новое событие:</b>\n\n{event_text}", parse_mode="HTML"
+                )
                 await add_event_to_history_all(event_text)
             except Exception as e:
                 continue
@@ -344,11 +334,14 @@ async def confirm_event_send(message: types.Message, state: FSMContext):
         await answer_html(message, f'Страна "{country_name}" не найдена.', reply_markup=None)
         return
     try:
-        await message.bot.send_message(user_id, f"⚡️ <b>В вашей стране случилось новое событие:</b>\n\n{event_text}", parse_mode="HTML")
+        await message.bot.send_message(
+            user_id, f"⚡️ <b>В вашей стране случилось новое событие:</b>\n\n{event_text}", parse_mode="HTML"
+        )
         await add_event_to_history(user_id, event_text)
         await answer_html(message, "Событие отправлено игроку.", reply_markup=None)
     except Exception as e:
         await answer_html(message, "Ошибка при отправке события игроку.", reply_markup=None)
+
 
 @router.message(Command("send"))
 async def admin_prepare_send_message(message: types.Message, state: FSMContext):
@@ -368,7 +361,11 @@ async def admin_prepare_send_message(message: types.Message, state: FSMContext):
     await state.set_state(AdminSendMessage.waiting_message)
     await state.update_data(target=target)
 
-    await answer_html(message, f"Введите текст сообщения, которое нужно отправить {'всем странам' if target.lower() == 'все' else f'стране {target}'}:")
+    await answer_html(
+        message,
+        f"Введите текст сообщения, которое нужно отправить {'всем странам' if target.lower() == 'все' else f'стране {target}'}:",
+    )
+
 
 @router.message(AdminSendMessage.waiting_message)
 async def admin_do_send_message(message: types.Message, state: FSMContext):
@@ -400,6 +397,7 @@ async def admin_do_send_message(message: types.Message, state: FSMContext):
     except Exception:
         await answer_html(message, "Ошибка при отправке сообщения игроку.")
 
+
 @router.message(Command("countries"))
 async def admin_list_country_synonyms(message: types.Message):
     if message.chat.id != ADMIN_CHAT_ID:
@@ -420,6 +418,7 @@ async def admin_list_country_synonyms(message: types.Message):
 
     text = "<b>Страны и их синонимы:</b>\n" + "\n".join(lines)
     await answer_html(message, text)
+
 
 @router.message(Command("add_synonym"))
 async def admin_prepare_add_synonym(message: types.Message, state: FSMContext):
@@ -443,12 +442,13 @@ async def admin_prepare_add_synonym(message: types.Message, state: FSMContext):
 
     await state.set_state(AddCountrySynonym.waiting_for_synonym)
     await state.update_data(main_country=main_country)
-    await answer_html(message, f'Введите синоним для страны <b>{main_country}</b>:')
+    await answer_html(message, f"Введите синоним для страны <b>{main_country}</b>:")
+
 
 @router.message(AddCountrySynonym.waiting_for_synonym)
 async def admin_add_synonym(message: types.Message, state: FSMContext):
     data = await state.get_data()
-    if not data or 'main_country' not in data:
+    if not data or "main_country" not in data:
         await answer_html(message, "Не выбрана страна. Начните с /add_synonym [страна].")
         await state.clear()
         return
@@ -458,10 +458,11 @@ async def admin_add_synonym(message: types.Message, state: FSMContext):
         await answer_html(message, "Синоним не может быть пустым. Введите синоним или /cancel для отмены.")
         return
 
-    main_country = data['main_country']
+    main_country = data["main_country"]
     await add_country_synonym(main_country, synonym)
-    await answer_html(message, f'Синоним <b>{synonym}</b> добавлен для страны <b>{main_country}</b>.')
+    await answer_html(message, f"Синоним <b>{synonym}</b> добавлен для страны <b>{main_country}</b>.")
     await state.clear()
+
 
 @router.message(Command("help"))
 async def admin_help(message: types.Message):
@@ -480,10 +481,9 @@ async def admin_help(message: types.Message):
         "<b>/add_synonym [страна]</b> — добавить синоним для страны (бот спросит синоним)\n"
         "<b>/help</b> — показать эту справку\n\n"
         "<i>Во всех командах вместо названия страны можно использовать её синоним!</i>\n\n"
-        "<b>Доступные аспекты:</b>\n"
-        + ", ".join(f"<b>{a[0]}</b>" for a in ASPECTS) +
-        ", <b>описание</b>"
+        "<b>Доступные аспекты:</b>\n" + ", ".join(f"<b>{a[0]}</b>" for a in ASPECTS) + ", <b>описание</b>",
     )
+
 
 def register(dp):
     dp.include_router(router)

@@ -1,10 +1,11 @@
+import asyncio
 import logging
 import re
-import asyncio
 
 logger = logging.getLogger(__name__)
 
 TELEGRAM_MAX_LENGTH = 4096
+
 
 def split_long_message(text: str, max_length: int = TELEGRAM_MAX_LENGTH):
     """
@@ -14,14 +15,15 @@ def split_long_message(text: str, max_length: int = TELEGRAM_MAX_LENGTH):
     parts = []
     while len(text) > max_length:
         # Ищем ближайший конец абзаца до лимита
-        split_idx = text.rfind('\n', 0, max_length)
+        split_idx = text.rfind("\n", 0, max_length)
         if split_idx == -1 or split_idx < max_length * 0.5:
             # Если абзаца не нашли, рвём в лоб
             split_idx = max_length
         parts.append(text[:split_idx])
-        text = text[split_idx:].lstrip('\n')
+        text = text[split_idx:].lstrip("\n")
     parts.append(text)
     return parts
+
 
 async def answer_html(message, text: str, **kwargs):
     """
@@ -36,6 +38,7 @@ async def answer_html(message, text: str, **kwargs):
             logger.warning(f"Не удалось отправить сообщение в HTML: {str(e)}. Пробуем отправить без форматирования.")
             await message.answer(part, **kwargs)
 
+
 async def send_html(bot, chat_id, text: str, **kwargs):
     """
     Безопасная отправка сообщения в чат (канал, группу или user) с parse_mode="HTML".
@@ -46,8 +49,11 @@ async def send_html(bot, chat_id, text: str, **kwargs):
         try:
             await bot.send_message(chat_id, part, parse_mode="HTML", **kwargs)
         except Exception as e:
-            logger.warning(f"Не удалось отправить сообщение в HTML (bot.send_message): {str(e)}. Пробуем без форматирования.")
+            logger.warning(
+                f"Не удалось отправить сообщение в HTML (bot.send_message): {str(e)}. Пробуем без форматирования."
+            )
             await bot.send_message(chat_id, part, **kwargs)
+
 
 async def keep_typing(bot, chat_id):
     """
@@ -62,6 +68,7 @@ async def keep_typing(bot, chat_id):
     except Exception as e:
         logger.error(f"Ошибка в keep_typing: {str(e)}", exc_info=True)
 
+
 def clean_ai_response(text: str, separator: str = None) -> str:
     """
     Возвращает текст между первым <think> или </think> (исключая тег)
@@ -71,7 +78,7 @@ def clean_ai_response(text: str, separator: str = None) -> str:
     Если ничего не найдено — возвращает исходный текст.
     """
     end = -1
-    for close_tag in ('</think>', '&lt;/think&gt;'):
+    for close_tag in ("</think>", "&lt;/think&gt;"):
         open_idx = text.find(close_tag)
         if open_idx != -1:
             end = open_idx
@@ -95,9 +102,11 @@ def clean_ai_response(text: str, separator: str = None) -> str:
     # Если результат не пустой — вернуть его, иначе вернуть исходник
     return result if result else text.strip()
 
+
 def stars_to_bold(text):
     # Заменяем все **text** на <b>text</b>
-    return re.sub(r'\*\*(.+?)\*\*', r'<b>\1</b>', text)
+    return re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", text)
+
 
 txt = """ijdsoijdsf</think>О, государь, каковы ветра, которые подуют на твою страну, если ты предпримешь подобное предприятие! Деревянные изделия — это путь, по которому можно пойти, но стоит ли связывать судьбу твоего царства с тем, что может быть воспринято как шокирующее или презренное другими царями и народами? Думаю, что твои друиды, хранители мудрости и природы, могут усмотреть иные пути, более почтенные и прибыльные, для твоего царства.
 

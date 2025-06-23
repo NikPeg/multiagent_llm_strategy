@@ -1,12 +1,14 @@
-from aiogram import types, Router
+from aiogram import Router, types
 from aiogram.filters import Command
-
-from utils import answer_html
-from database import *
 from aiogram.fsm.context import FSMContext
+
+from database import *
+from utils import answer_html
+
 from .fsm import SendMessageFSM
 
 router = Router()
+
 
 @router.message(Command("start"))
 async def start(message: types.Message):
@@ -37,7 +39,7 @@ async def start(message: types.Message):
     await answer_html(
         message,
         "Добро пожаловать в ролевую геополитическую игру эпохи древнего мира!\n\n"
-        "Для начала укажи <b>название своей страны</b>:"
+        "Для начала укажи <b>название своей страны</b>:",
     )
 
 
@@ -47,12 +49,14 @@ async def new_chat(message: types.Message):
     await clear_history(user_id)
     await answer_html(message, "Контекст диалога сброшен!⚔️")
 
+
 def format_ancient_letter(sender_country: str, text: str) -> str:
     return (
         f"📜 К воротам вашего дворца явился глашатай из державы {sender_country}!\n\n"
         f"Передает вам свиток с посланием:\n\n"
         f"{text}"
     )
+
 
 @router.message(Command("send"))
 async def cmd_send(message: types.Message, state: FSMContext):
@@ -76,6 +80,7 @@ async def cmd_send(message: types.Message, state: FSMContext):
             await message.answer("Укажите название страны. В системе пока нет зарегистрированных стран.")
         await state.set_state(SendMessageFSM.waiting_for_country)
 
+
 @router.message(SendMessageFSM.waiting_for_country)
 async def ask_country(message: types.Message, state: FSMContext):
     country = message.text.strip()
@@ -86,6 +91,7 @@ async def ask_country(message: types.Message, state: FSMContext):
     await state.update_data(country=country)
     await state.set_state(SendMessageFSM.waiting_for_text)
     await message.answer(f"Введите текст послания для державы '{country}':")
+
 
 @router.message(SendMessageFSM.waiting_for_text)
 async def send_letter(message: types.Message, state: FSMContext):
@@ -111,6 +117,7 @@ async def send_letter(message: types.Message, state: FSMContext):
     except Exception:
         await message.answer("Ошибка: не удалось отправить сообщение получателю (он мог заблокировать бота).")
     await state.clear()
+
 
 def register(dp):
     dp.include_router(router)

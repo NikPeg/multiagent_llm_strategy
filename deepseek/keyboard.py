@@ -1,5 +1,7 @@
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton
+from aiogram.types import KeyboardButton, ReplyKeyboardMarkup
+
 from game import ASPECTS
+
 
 def aspects_keyboard():
     # Кнопки с названиями аспектов (плюс описание страны)
@@ -10,7 +12,8 @@ def aspects_keyboard():
         keyboard=keyboard,
         resize_keyboard=True,
         is_persistent=True,  # клавиатура постоянная
-        input_field_placeholder="Выбери аспект или напиши свой ход"
+        input_field_placeholder="Выбери аспект или напиши свой ход",
     )
+
 
 ASPECTS_KEYBOARD = aspects_keyboard()

@@ -1,19 +1,20 @@
-from aiogram import types, Router
+from aiogram import Router, types
 from aiogram.filters import Command
 from aiogram.fsm.context import FSMContext
 
-from utils import answer_html
 from database import (
     clear_history,
     clear_user_aspects,
+    set_aspect_index,
     set_user_country,
     set_user_country_desc,
-    set_aspect_index,
 )
+from utils import answer_html
 
-from .fsm import ResetCountry, RegisterCountry
+from .fsm import RegisterCountry, ResetCountry
 
 router = Router()
+
 
 @router.message(Command("reset_country"))
 async def reset_country(message: types.Message, state: FSMContext):
@@ -23,7 +24,7 @@ async def reset_country(message: types.Message, state: FSMContext):
         message,
         "⚠️ <b>Внимание!</b> После сброса вы потеряете ВСЮ информацию о вашей текущей стране, её аспектах и истории.\n\n"
         "Если вы уверены, напишите <b>ДА</b>.\n"
-        "Для отмены введите /cancel."
+        "Для отмены введите /cancel.",
     )
 
 
@@ -41,13 +42,11 @@ async def confirm_reset_country(message: types.Message, state: FSMContext):
         await answer_html(
             message,
             "⏳ Регистрация страны сброшена!\n\n"
-            "Введи <b>новое название твоей страны</b>, чтобы начать историю заново:"
+            "Введи <b>новое название твоей страны</b>, чтобы начать историю заново:",
         )
     else:
-        await answer_html(
-            message,
-            "Введите <b>ДА</b>, чтобы подтвердить сброс, или /cancel для отмены."
-        )
+        await answer_html(message, "Введите <b>ДА</b>, чтобы подтвердить сброс, или /cancel для отмены.")
+
 
 def register(dp):
     dp.include_router(router)

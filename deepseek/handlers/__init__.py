@@ -1,9 +1,5 @@
-from . import user_commands
-from . import registration
-from . import admin
-from . import cancel
-from . import game_aspects_buttons
-from . import game_logic
+from . import admin, cancel, game_aspects_buttons, game_logic, registration, user_commands
+
 
 def register_handlers(dp):
     user_commands.register(dp)
