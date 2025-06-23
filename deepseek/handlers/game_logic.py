@@ -3,7 +3,7 @@ from config import ADMIN_CHAT_ID, GAME_PROMPT, RPG_PROMPT, HISTORY_LIMIT
 from database import (
     set_user_country, set_user_country_desc, set_user_aspect
 )
-from aiogram import Router
+from aiogram import Router, types
 from utils import answer_html, send_html, keep_typing, stars_to_bold
 from game import ASPECTS
 from model_handler import model_handler, executor
