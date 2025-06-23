@@ -3,7 +3,7 @@ from config import ADMIN_CHAT_ID, GAME_PROMPT, RPG_PROMPT, HISTORY_LIMIT
 from database import (
     set_user_country, set_user_country_desc, set_user_aspect
 )
-from aiogram import Router, types
+from aiogram import Router, types, F
 from utils import answer_html, send_html, keep_typing, stars_to_bold
 from game import ASPECTS
 from aiogram.fsm.context import FSMContext
