@@ -11,7 +11,7 @@ from database import (
     set_aspect_index,
 )
 
-from .fsm import ResetCountry
+from .fsm import ResetCountry, RegisterCountry
 
 router = Router()
 
@@ -37,11 +37,11 @@ async def confirm_reset_country(message: types.Message, state: FSMContext):
         await set_user_country(user_id, None)
         await set_user_country_desc(user_id, None)
         await set_aspect_index(user_id, None)
-        await state.clear()
+        await state.set_state(RegisterCountry.waiting_for_name)
         await answer_html(
             message,
             "⏳ Регистрация страны сброшена!\n\n"
-            "Введите <b>новое название вашей страны</b> для повторной регистрации:"
+            "Введи <b>новое название твоей страны</b>, чтобы начать историю заново:"
         )
     else:
         await answer_html(
